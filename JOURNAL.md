@@ -55,6 +55,32 @@ These are known limitations as of v0.1.0, grounded in the JSONL audit:
 
 ---
 
+## 2026-05-30 — docs-check gap and recurring doc link pattern
+
+CI failed on `cargo doc` again after the `aegon-core` PR because `just docs-check` was running without `RUSTDOCFLAGS="-D warnings"`. Locally, broken intra-doc links are *warnings*; CI promotes them to *errors*. This is now fixed — `docs-check` passes the flag explicitly so the gap between local and CI is closed.
+
+**Pattern to remember:** any new crate that references types from a sibling crate in doc comments needs the full `crate_name::Type` path, not the bare type name. The compiler knows about `use` imports but rustdoc resolves links in the item's own scope, not the import scope. Methods on `self` need `[Self::method]`; struct fields cannot be linked with `[brackets]` at all — use backticks.
+
+---
+
+## 2026-05-30 — Justfile entry points and dependency setup
+
+Added `just setup`, `just run`, `just watch`, `just demo`, and `just audit-jsonl`. Previously getting started required knowing to run `brew install tmux gh` manually and then find the binary. Now `just setup && just run` is the complete onboarding path.
+
+`just demo` uses `osascript` to open a new Terminal window — macOS-only. If Linux support is added later, this recipe will need a branch for `xterm` or similar.
+
+---
+
+## 2026-05-30 — Live demo: parser crash discovered during demo run
+
+During the first live demo run, the watcher was printing `skipping unparseable line: invalid type: map, expected u64` for almost every assistant record. Root cause: `cache_creation` and `server_tool_use` in the Claude API `usage` object are nested JSON objects, not numbers. `RawUsage` had `cache_creation: u64` which caused serde to hard-fail on the entire record — dropping all events from that line silently from the TUI's perspective.
+
+Fix: removed `cache_creation` from `RawUsage`. Since serde ignores unknown fields by default (no `deny_unknown_fields`), both fields are now skipped cleanly. This was only caught by running the actual binary against real session files — the unit tests used handcrafted JSON that didn't include these fields.
+
+**Lesson:** always run the binary against real `~/.claude/projects/` data before shipping an adapter change. The real JSONL has object-valued usage fields that handcrafted test JSON never will.
+
+---
+
 ## 2026-05-30 — v0.3.0: aegon-core + split dashboard TUI
 
 ### What was built
