@@ -11,6 +11,24 @@ Versions are dated `YYYY-MM-DD`. Unreleased work sits under `[Unreleased]`.
 
 ---
 
+## [0.3.2] — 2026-05-30
+
+### Fixed
+- Broken intra-doc links in `aegon-core` (`FlowNode::Tool` → `FlowNode::ToolGroup`, bare method names → `Self::method`, cross-crate types → `aegon_types::` prefix)
+- `just docs-check` now runs with `RUSTDOCFLAGS="-D warnings"` to mirror CI — broken links are now errors locally, not just in CI
+
+---
+
+## [0.3.1] — 2026-05-30
+
+### Added
+- `just setup` — installs all system (tmux, gh, just) and Cargo (cargo-outdated, cargo-audit) dependencies in one command
+- `just run` / `just watch` — build and launch the TUI watcher in the current terminal
+- `just demo` — launch in a new macOS Terminal window via osascript
+- `just audit-jsonl` — run `examples/jsonl/audit.py` against real session files
+
+---
+
 ## [0.3.0] — 2026-05-30
 
 ### Added
