@@ -36,6 +36,13 @@ pub struct SessionState {
     /// Useful for per-turn gauges that would be meaningless if shown
     /// as a cumulative total across hundreds of turns.
     pub last_turn_usage: Option<aegon_types::TokenUsage>,
+    /// Whether the session is waiting for an assistant response.
+    ///
+    /// Set to `true` when a `UserMessage` arrives; cleared when the
+    /// `AssistantMessage` arrives. Drives the "Thinking…" spinner in the
+    /// dashboard — the model is reasoning but the JSONL record hasn't been
+    /// flushed yet.
+    pub awaiting_response: bool,
     /// Auto-generated session title from the `ai-title` record, if seen.
     pub title: Option<String>,
     /// Total number of events ingested (for display).
@@ -94,6 +101,8 @@ impl SessionState {
                     self.token_totals.add(u);
                     self.last_turn_usage = Some(u.clone());
                 }
+                // Model has responded — no longer waiting.
+                self.awaiting_response = false;
                 self.push_flow(FlowNode::Assistant);
             }
 
@@ -110,6 +119,8 @@ impl SessionState {
                 // never receive results (the session moved on or was aborted).
                 // Resolve them as Done so they don't clog the Steps panel.
                 self.drain_orphaned_pending(event.timestamp);
+                // Model now needs to respond — start showing the thinking spinner.
+                self.awaiting_response = true;
                 self.push_flow(FlowNode::Human);
             }
 

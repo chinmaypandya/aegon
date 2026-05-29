@@ -26,6 +26,25 @@ pub fn draw(f: &mut Frame, area: Rect, state: &SessionState, tick: u64) {
     let capacity = area.height.saturating_sub(2) as usize; // subtract border lines
     let mut items: Vec<ListItem> = Vec::new();
 
+    // Thinking placeholder — model is reasoning but the JSONL record hasn't
+    // been flushed yet. Gives real-time feedback while the turn is in flight.
+    if state.awaiting_response {
+        items.push(ListItem::new(Line::from(vec![
+            Span::styled(
+                format!("{spinner} "),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "Thinking…   ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ])));
+    }
+
     // Running steps — only those started within the recent window.
     let now = chrono::Utc::now();
     let mut running: Vec<_> = state
