@@ -8,6 +8,12 @@ event feed on the left and an aggregated dashboard on the right.
 
 ---
 
+# Demo
+
+https://github.com/user-attachments/assets/a34fd65b-3872-40b2-a0a4-ef012dcf0c0a
+
+---
+
 ## What it looks like
 
 ```
