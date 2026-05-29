@@ -88,12 +88,12 @@ pub struct RawUsage {
     pub output_tokens: u64,
     #[serde(default)]
     pub cache_read_input_tokens: u64,
-    /// Primary cache creation key.
+    /// Token count for prompt tokens written into the cache this turn.
     #[serde(default)]
     pub cache_creation_input_tokens: u64,
-    /// Alternate cache creation key seen on some responses.
-    #[serde(default)]
-    pub cache_creation: u64,
+    // NOTE: `cache_creation` and `server_tool_use` are nested objects in
+    // the JSON, not numbers. They are intentionally absent here so serde
+    // skips them rather than failing with "expected u64, got map".
 }
 
 /// Supplementary execution metadata written to `toolUseResult` on `user` records.
