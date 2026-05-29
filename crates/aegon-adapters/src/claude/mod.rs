@@ -55,12 +55,7 @@ impl Adapter for ClaudeAdapter {
                         input_tokens: u.input_tokens,
                         output_tokens: u.output_tokens,
                         cache_read_input_tokens: u.cache_read_input_tokens,
-                        // Prefer the explicit key; fall back to the alternate.
-                        cache_creation_input_tokens: if u.cache_creation_input_tokens > 0 {
-                            u.cache_creation_input_tokens
-                        } else {
-                            u.cache_creation
-                        },
+                        cache_creation_input_tokens: u.cache_creation_input_tokens,
                     });
 
                     let mut text_parts: Vec<String> = Vec::new();
@@ -394,7 +389,9 @@ mod tests {
     }
 
     #[test]
-    fn alternate_cache_creation_key_is_read() {
+    fn object_valued_usage_fields_do_not_crash_parser() {
+        // server_tool_use and cache_creation are objects in real JSONL, not numbers.
+        // The parser must skip them cleanly rather than returning Err.
         let line = r#"{
             "type":"assistant",
             "uuid":"00000000-0000-0000-0000-000000000010",
@@ -402,18 +399,19 @@ mod tests {
             "message":{
                 "role":"assistant",
                 "content":[{"type":"text","text":"ok"}],
-                "usage":{"input_tokens":5,"output_tokens":2,"cache_creation":3}
+                "usage":{
+                    "input_tokens":5,
+                    "output_tokens":2,
+                    "cache_creation":{"some_nested":"object"},
+                    "server_tool_use":{"web_search_requests":0,"web_fetch_requests":0}
+                }
             }
         }"#;
         let events = adapter().parse_line(line).unwrap();
-        let usage = events.iter().find_map(|e| {
-            if let EventKind::AssistantMessage { usage, .. } = &e.kind {
-                usage.as_ref()
-            } else {
-                None
-            }
-        });
-        assert_eq!(usage.unwrap().cache_creation_input_tokens, 3);
+        assert!(
+            !events.is_empty(),
+            "should still produce events despite unknown object fields"
+        );
     }
 
     // ── parse_line error path ────────────────────────────────────────────────
