@@ -13,12 +13,12 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
+    Terminal,
 };
 use std::io;
 use std::sync::mpsc::Receiver;
@@ -86,7 +86,11 @@ fn draw(f: &mut ratatui::Frame, app: &App) {
 
     // ── Header ──────────────────────────────────────────────────────────────
     let header = Paragraph::new("Aegon — Claude Code session monitor")
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .block(
             Block::default()
                 .borders(Borders::ALL)
