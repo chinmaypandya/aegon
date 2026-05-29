@@ -1,2 +1,44 @@
 [workspace]
-resolver="2"
+resolver = "2"
+members = [
+    "crates/aegon-types",
+    "crates/aegon-adapters",
+    "crates/aegon-cli",
+    "crates/aegon-ui",
+]
+default-members = ["crates/aegon-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Internal
+aegon-types = { path = "crates/aegon-types" }
+aegon-adapters = { path = "crates/aegon-adapters" }
+aegon-ui = { path = "crates/aegon-ui" }
+
+# Serialisation
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+dirs = "5"
+thiserror = "2"
+anyhow = "1"
+
+# File watching
+notify = "6"
+
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Dev
+tempfile = "3"
