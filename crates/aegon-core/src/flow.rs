@@ -1,13 +1,13 @@
 //! Causal-chain representation of a session's event sequence.
 //!
 //! A [`FlowNode`] is the unit of the flow visualization. The sequence of
-//! nodes in [`SessionState::flow`] tells the story of what happened and in
+//! nodes in `SessionState.flow` tells the story of what happened and in
 //! what order — human input, thinking, parallel tool dispatches, and the
 //! assistant's response.
 
 /// One node in the causal flow of a session.
 ///
-/// Consecutive [`FlowNode::Tool`] entries that share the same `parent_id`
+/// Consecutive [`FlowNode::ToolGroup`] entries that share the same `parent_id`
 /// in the original events are considered a parallel group and rendered
 /// side-by-side (e.g. `[Bash ‖ Read]`).
 #[derive(Debug, Clone, PartialEq)]
