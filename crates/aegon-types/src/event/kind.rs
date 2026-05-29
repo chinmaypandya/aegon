@@ -1,9 +1,9 @@
-//! Variants describing what kind of event a [`LogEvent`] carries.
+//! Variants describing what kind of event a [`crate::LogEvent`] carries.
 
 use crate::{TokenUsage, ToolCall, ToolResult};
 use serde::{Deserialize, Serialize};
 
-/// The payload of a single [`LogEvent`].
+/// The payload of a single [`crate::LogEvent`].
 ///
 /// Each variant corresponds to one observable action in a Claude Code session.
 /// Unknown or future event types are captured by [`EventKind::Unknown`] so the

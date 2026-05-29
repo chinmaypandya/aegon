@@ -10,7 +10,7 @@ const MAX_EVENTS: usize = 500;
 
 /// Live application state rendered by the TUI.
 pub struct App {
-    /// Most recent events in arrival order, capped at [`MAX_EVENTS`].
+    /// Most recent events in arrival order, capped at 500 entries.
     pub events: Vec<LogEvent>,
     /// Whether the user has requested the application to quit.
     pub should_quit: bool,
