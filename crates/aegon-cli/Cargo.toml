@@ -3,6 +3,8 @@ name = "aegon-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "CLI entry point for Aegon — watches Claude Code session files and renders them live."
 
 [[bin]]

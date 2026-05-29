@@ -3,6 +3,8 @@ name = "aegon-adapters"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Per-tool JSONL adapters that normalise raw events into aegon-types."
 
 [dependencies]
