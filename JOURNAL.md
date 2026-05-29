@@ -55,6 +55,43 @@ These are known limitations as of v0.1.0, grounded in the JSONL audit:
 
 ---
 
+## 2026-05-30 — v0.3.0: aegon-core + split dashboard TUI
+
+### What was built
+
+`aegon-core` — the pure computation layer described in CLAUDE.md from day one, now implemented:
+
+- `SessionState::ingest(event)` is the single mutation point. It classifies each event, updates pending tool calls, detects when parallel branches complete, accumulates token totals, and extends the causal flow chain — no I/O, no side effects.
+- `SessionRegistry` routes events to the right session and creates new ones on first sight.
+- `FlowNode::ToolGroup(Vec<String>)` groups parallel tool calls by checking whether a new `ToolCall` shares a `parent_id` with already-pending calls — if so, it merges into the same group.
+
+The TUI now splits 50/50: left shows the raw event feed (width-adaptive truncation), right shows the live dashboard for the most recent session — token gauge auto-filling, braille spinners on active tool calls, ✓/✗ on completed steps, and the causal flow string.
+
+### Achievements
+
+- `aegon-core` compiles with zero dependencies beyond `aegon-types` and `chrono`/`uuid`
+- Split TUI renders correctly and `cargo doc` passes clean
+- First `README.md` written — overview, architecture diagram, crate map
+- `SessionState` correctly tracks parallel branches via `parent_id` heuristic
+
+### Caveats
+
+- `SessionRegistry.order` has a subtle bug: `entry().or_insert_with()` mutates `self.sessions` but `self.order.push(id)` inside the closure runs before the entry is confirmed — works correctly in practice because the closure only runs on insertion, but it's a borrow-checker workaround worth revisiting
+- Token gauge denominator is hard-coded at 200k; the actual context limit varies by model and isn't in the JSONL
+- `estimated_cost_usd()` uses approximate pricing that will drift as Anthropic adjusts rates
+- Dashboard shows only the *latest* session; multi-session view (one column per session) is not yet built
+- No persistence — `SessionState` is rebuilt from scratch every time `aegon` is launched
+
+### Next steps (revised priority)
+
+1. **Multi-session columns** in the dashboard — already have the data, just need the layout
+2. **Session metadata** (`cwd`, `gitBranch`, `ai-title`) captured into `Session` and shown in dashboard header
+3. **`aegon-db`** — SQLite persistence so sessions survive process restarts
+4. **`aegon history`** / **`aegon replay`** — query and replay past sessions
+5. **agentId / attributionSkill** on `LogEvent` (gap #4 from original list)
+
+---
+
 ## 2026-05-30 — v0.2.0: adapter gap fixes (thinking, sidechain, tool metadata)
 
 ### What was built

@@ -7,11 +7,13 @@ description = "Terminal UI for Aegon — live ratatui dashboard for Claude Code 
 
 [dependencies]
 aegon-types = { workspace = true }
+aegon-core = { workspace = true }
 anyhow = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 serde_json = { workspace = true }
 
-[dev-dependencies]
 chrono = { workspace = true }
+
+[dev-dependencies]
 uuid = { workspace = true }

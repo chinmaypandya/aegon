@@ -11,6 +11,36 @@ Versions are dated `YYYY-MM-DD`. Unreleased work sits under `[Unreleased]`.
 
 ---
 
+## [0.3.0] — 2026-05-30
+
+### Added
+
+**`aegon-core`** — new crate, pure session logic with no I/O
+- `SessionState` — ingests `LogEvent`s and maintains: pending tool calls, completed step history with timing, cumulative token totals, ordered causal flow nodes
+- `SessionRegistry` — routes events to per-session state; creates sessions on first sight; tracks insertion order
+- `Step` / `StepStatus` — one tool invocation through `Running → Done/Failed`; records wall-clock duration
+- `FlowNode` — causal chain unit: `Human`, `Thinking`, `ToolGroup(Vec<String>)`, `Assistant`; parallel dispatch detected via shared `parent_id`
+- `TokenTotals` — accumulates `input`, `output`, `cache_read`, `cache_created` across all turns; `estimated_cost_usd()` for rough cost display
+
+**`aegon-ui`** — dashboard panel (right half of the split TUI)
+- `dashboard::draw` — splits right panel into session header, token gauge, steps list, and flow string
+- `dashboard::gauge` — ratatui `Gauge` showing token usage against 200k context limit; colour shifts green → yellow → red as context fills; estimated cost display
+- `dashboard::steps` — braille spinner on active tool calls with elapsed time; ✓/✗ icons on completed/failed steps with duration
+- `dashboard::flow` — one-line causal chain: `USER → THINK → [Bash ‖ Read] → ASST` with parallel groups rendered inline
+
+**`aegon-ui`** — split TUI layout
+- Left 50%: raw event feed (width-aware truncation — no more hard-coded 80 chars)
+- Right 50%: live dashboard for the latest active session
+
+**`README.md`** — first version: overview, ASCII screenshot of the split TUI, architecture diagram, crate map, and quick-start instructions
+
+### Changed
+- `App` now holds `SessionRegistry` alongside the raw event buffer; `push` feeds both
+- `App::tick()` advances a frame counter used for spinner animation
+- `format_event` now takes `max_detail: usize` (derived from actual terminal width) instead of hard-coding 80
+
+---
+
 ## [0.2.0] — 2026-05-30
 
 ### Added

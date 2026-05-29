@@ -5,6 +5,7 @@ members = [
     "crates/aegon-adapters",
     "crates/aegon-cli",
     "crates/aegon-ui",
+    "crates/aegon-core",
 ]
 default-members = ["crates/aegon-cli"]
 
@@ -18,6 +19,7 @@ license = "MIT OR Apache-2.0"
 aegon-types = { path = "crates/aegon-types" }
 aegon-adapters = { path = "crates/aegon-adapters" }
 aegon-ui = { path = "crates/aegon-ui" }
+aegon-core = { path = "crates/aegon-core" }
 
 # Serialisation
 serde = { version = "1", features = ["derive"] }

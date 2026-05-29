@@ -1,10 +1,11 @@
-//! Terminal UI — renders live [`LogEvent`]s using ratatui.
+//! Terminal UI — split view: raw event feed (left) + dashboard (right).
 //!
 //! Runs on the caller's thread. Receives events from the watcher over a
 //! channel, updates [`App`] state, and redraws on every tick. Press `q` or
 //! `Esc` to quit.
 
 use crate::app::App;
+use crate::dashboard;
 use aegon_types::{EventKind, LogEvent, StreamId};
 use anyhow::Result;
 use crossterm::{
@@ -54,6 +55,7 @@ fn event_loop(
                 app.push(event);
             }
         }
+        app.tick();
 
         terminal.draw(|f| draw(f, &app))?;
 
@@ -75,36 +77,59 @@ fn event_loop(
 }
 
 fn draw(f: &mut ratatui::Frame, app: &App) {
-    let chunks = Layout::default()
+    // ── Outer layout: header / body / footer ────────────────────────────────
+    let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
+            Constraint::Length(1),
             Constraint::Min(0),
             Constraint::Length(1),
         ])
         .split(f.area());
 
-    // ── Header ──────────────────────────────────────────────────────────────
-    let header = Paragraph::new("Aegon — Claude Code session monitor")
-        .style(
+    // Header bar
+    let sessions_label = format!(
+        " Aegon   {} sessions   {} events ",
+        app.sessions.len(),
+        app.events.len()
+    );
+    f.render_widget(
+        Paragraph::new(sessions_label).style(
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
-        )
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded),
-        );
-    f.render_widget(header, chunks[0]);
+        ),
+        outer[0],
+    );
 
-    // ── Event list ──────────────────────────────────────────────────────────
+    // ── Body: raw feed (left 50%) | dashboard (right 50%) ───────────────────
+    let body = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(outer[1]);
+
+    draw_feed(f, body[0], app);
+    draw_dashboard_panel(f, body[1], app);
+
+    // Footer
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(" q", Style::default().fg(Color::Yellow)),
+            Span::raw(" quit"),
+        ])),
+        outer[2],
+    );
+}
+
+/// Left panel: raw event feed newest-first.
+fn draw_feed(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app: &App) {
+    let avail = area.width.saturating_sub(22) as usize; // subtract label+timestamp prefix
     let items: Vec<ListItem> = app
         .events
         .iter()
         .rev()
-        .take(chunks[1].height as usize)
-        .map(|e| ListItem::new(format_event(e)))
+        .take(area.height as usize)
+        .map(|e| ListItem::new(format_event(e, avail)))
         .collect();
 
     let list = List::new(items).block(
@@ -113,21 +138,28 @@ fn draw(f: &mut ratatui::Frame, app: &App) {
             .border_type(BorderType::Rounded)
             .title(" Events (newest first) "),
     );
-    f.render_widget(list, chunks[1]);
-
-    // ── Footer ───────────────────────────────────────────────────────────────
-    let footer = Paragraph::new(Line::from(vec![
-        Span::styled(" q", Style::default().fg(Color::Yellow)),
-        Span::raw(" quit  "),
-        Span::styled(
-            format!(" {} events", app.events.len()),
-            Style::default().fg(Color::DarkGray),
-        ),
-    ]));
-    f.render_widget(footer, chunks[2]);
+    f.render_widget(list, area);
 }
 
-fn format_event(e: &LogEvent) -> Line<'static> {
+/// Right panel: aggregated dashboard for the latest active session.
+fn draw_dashboard_panel(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app: &App) {
+    match app.sessions.latest() {
+        Some(state) => dashboard::draw(f, area, state, app.tick),
+        None => {
+            let placeholder = Paragraph::new("Waiting for session events…")
+                .style(Style::default().fg(Color::DarkGray))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .title(" Dashboard "),
+                );
+            f.render_widget(placeholder, area);
+        }
+    }
+}
+
+fn format_event(e: &LogEvent, max_detail: usize) -> Line<'static> {
     let ts = e.timestamp.format("%H:%M:%S").to_string();
     let (label, color, detail) = match &e.kind {
         EventKind::ToolCall(tc) => (
@@ -135,11 +167,13 @@ fn format_event(e: &LogEvent) -> Line<'static> {
             Color::Green,
             format!("{} {}", tc.name, summarise_input(&tc.input)),
         ),
-        EventKind::ToolResult(tr) => ("TOOL◀", Color::Blue, truncate(&tr.content, 80)),
+        EventKind::ToolResult(tr) => ("TOOL◀", Color::Blue, truncate(&tr.content, max_detail)),
         EventKind::AssistantMessage { content, .. } => {
-            ("ASST ", Color::Magenta, truncate(content, 80))
+            ("ASST ", Color::Magenta, truncate(content, max_detail))
         }
-        EventKind::UserMessage { content } => ("USER ", Color::White, truncate(content, 80)),
+        EventKind::UserMessage { content } => {
+            ("USER ", Color::White, truncate(content, max_detail))
+        }
         EventKind::TokenUsage(u) => (
             "TKNS ",
             Color::DarkGray,
@@ -148,7 +182,7 @@ fn format_event(e: &LogEvent) -> Line<'static> {
                 u.input_tokens, u.output_tokens, u.cache_read_input_tokens
             ),
         ),
-        EventKind::Thinking { text, .. } => ("THINK", Color::Yellow, truncate(text, 80)),
+        EventKind::Thinking { text, .. } => ("THINK", Color::Yellow, truncate(text, max_detail)),
         EventKind::Unknown => ("???? ", Color::DarkGray, String::new()),
     };
 
