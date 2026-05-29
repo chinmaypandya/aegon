@@ -25,7 +25,7 @@ pub fn draw(f: &mut Frame, area: Rect, state: &SessionState, tick: u64) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // session header
-            Constraint::Length(5), // token gauge
+            Constraint::Length(6), // token gauge (bar + totals + cost)
             Constraint::Min(6),    // active steps
             Constraint::Length(3), // flow string
         ])

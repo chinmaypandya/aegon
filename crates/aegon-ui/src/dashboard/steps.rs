@@ -11,21 +11,59 @@ use ratatui::{
 
 const SPINNER: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-/// Draw running tool calls (with spinner) and the last few completed steps.
+/// Only show pending steps started within this window as truly "running".
+///
+/// Beyond this threshold the step is likely orphaned (interrupted session) and
+/// should not appear as in-flight to avoid cluttering the panel.
+const MAX_RUNNING_AGE_SECS: i64 = 30;
+
+/// Draw running tool calls (with spinner) and the most recent completed steps.
+///
+/// Completed steps are shown newest-first so the most recent work is always
+/// visible without scrolling.
 pub fn draw(f: &mut Frame, area: Rect, state: &SessionState, tick: u64) {
     let spinner = SPINNER[(tick as usize) % SPINNER.len()];
-
+    let capacity = area.height.saturating_sub(2) as usize; // subtract border lines
     let mut items: Vec<ListItem> = Vec::new();
 
-    // Running steps first, with spinner animation.
-    for step in state.running_steps() {
+    // Running steps — only those started within the recent window.
+    let now = chrono::Utc::now();
+    let mut running: Vec<_> = state
+        .running_steps()
+        .into_iter()
+        .filter(|s| {
+            if let StepStatus::Running { started_at } = &s.status {
+                (now - started_at).num_seconds() <= MAX_RUNNING_AGE_SECS
+            } else {
+                false
+            }
+        })
+        .collect();
+    // Most recently started first.
+    running.sort_by(|a, b| {
+        let ta = if let StepStatus::Running { started_at } = &a.status {
+            *started_at
+        } else {
+            now
+        };
+        let tb = if let StepStatus::Running { started_at } = &b.status {
+            *started_at
+        } else {
+            now
+        };
+        tb.cmp(&ta)
+    });
+
+    for step in &running {
+        if items.len() >= capacity {
+            break;
+        }
         let elapsed = if let StepStatus::Running { started_at } = &step.status {
-            let ms = (chrono::Utc::now() - started_at).num_milliseconds().max(0);
+            let ms = (now - started_at).num_milliseconds().max(0);
             format!("{:.1}s", ms as f64 / 1000.0)
         } else {
             String::new()
         };
-
         items.push(ListItem::new(Line::from(vec![
             Span::styled(
                 format!("{spinner} "),
@@ -46,18 +84,16 @@ pub fn draw(f: &mut Frame, area: Rect, state: &SessionState, tick: u64) {
         ])));
     }
 
-    // Most recent completed steps (newest last, show up to available height).
-    let max_completed = (area.height as usize).saturating_sub(items.len() + 2);
+    // Completed steps — newest first, fill remaining capacity.
+    let remaining = capacity.saturating_sub(items.len());
     let completed = state.completed_steps();
-    let start = completed.len().saturating_sub(max_completed);
 
-    for step in &completed[start..] {
+    for step in completed.iter().rev().take(remaining) {
         let (icon, color, timing) = match &step.status {
             StepStatus::Done { duration_ms } => ("✓", Color::Cyan, format!(" {duration_ms}ms")),
             StepStatus::Failed { duration_ms } => ("✗", Color::Red, format!(" {duration_ms}ms")),
             StepStatus::Running { .. } => continue,
         };
-
         items.push(ListItem::new(Line::from(vec![
             Span::styled(format!("{icon} "), Style::default().fg(color)),
             Span::styled(
@@ -72,7 +108,7 @@ pub fn draw(f: &mut Frame, area: Rect, state: &SessionState, tick: u64) {
         Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title(" Steps "),
+            .title(" Steps (newest first) "),
     );
     f.render_widget(list, area);
 }
