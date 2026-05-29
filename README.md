@@ -90,9 +90,22 @@ Right panel — **live dashboard**:
 
 ## Running
 
+**Quickest start — opens in a new Terminal window:**
+
 ```bash
-cargo run -p aegon-cli
-# or build first:
+just demo
+```
+
+**In your current terminal:**
+
+```bash
+just run          # build + launch in one step
+just watch        # alias for run
+```
+
+**Manual:**
+
+```bash
 cargo build --workspace
 ./target/debug/aegon
 ```
@@ -103,6 +116,12 @@ The watcher automatically picks up `~/.claude/projects/**/*.jsonl` and
 `~/.claude/sessions/**/*.jsonl`. Start a Claude Code session in another
 terminal — events appear in real time.
 
+**First time setup** (installs system deps and Cargo tools):
+
+```bash
+just setup
+```
+
 ---
 
 ## Development
@@ -112,6 +131,8 @@ just --list          # all available recipes
 just ci              # mirrors what CI runs (fmt + clippy + check + test + docs)
 just build           # cargo build --workspace
 just test            # cargo test --workspace
+just audit-jsonl     # scan ~/.claude/projects for JSONL structure insights
+just demo            # run the tool in a separate terminal for live demo
 ```
 
 See [CLAUDE.md](CLAUDE.md) for full design constraints, crate responsibilities,
@@ -119,3 +140,49 @@ and the development workflow.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history and [JOURNAL.md](JOURNAL.md)
 for design decisions and session notes.
+
+---
+
+## Contributing
+
+### Workflow
+
+All changes go through a branch → PR → squash-merge cycle. The full
+loop is documented in [CLAUDE.md](CLAUDE.md) and enforced by skills in
+`.claude/skills/`. In short:
+
+```bash
+just branch feat/<name>     # cut a branch from latest main
+# ... make changes ...
+just ci                     # must pass locally before pushing
+just push                   # push and set upstream
+just pr                     # open PR (gh will prompt for title + body)
+just merge                  # squash-merge once CI is green
+just cleanup feat/<name>    # delete local branch + prune remote refs
+```
+
+### Rules
+
+- **Never commit to `main` directly.** Every change goes through a PR.
+- **`just ci` must pass** before pushing. It runs `fmt`, `clippy -D warnings`,
+  `check`, `test`, and `cargo doc -D warnings` — exactly what CI runs.
+- **Every public item needs a doc comment.** `cargo doc -D warnings` is an
+  error, not a warning.
+- **CHANGELOG.md and JOURNAL.md** must be updated on every PR that changes
+  behaviour. `[Unreleased]` in CHANGELOG for unreleased changes; add a dated
+  JOURNAL entry with achievements, caveats, and next steps.
+- **No `unwrap()` or `expect()`** in library crates outside tests.
+- **Adapters must not use `#[serde(deny_unknown_fields)]`** on top-level event
+  types — the Claude JSONL format evolves without notice.
+
+### Adding a new tool adapter
+
+1. Create `crates/aegon-adapters/src/<tool>/mod.rs` and `raw.rs`
+2. Implement the `Adapter` trait from `crates/aegon-adapters/src/lib.rs`
+3. Add fixture JSONL samples to `aegon-tests/fixtures/<tool>/`
+4. Wire into `aegon-cli` via config or format detection
+
+### Codeowners
+
+`@chinmaypandya` is the default owner for all files. All PRs require
+approval before merge.
