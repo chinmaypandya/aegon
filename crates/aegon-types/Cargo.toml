@@ -3,6 +3,8 @@ name = "aegon-types"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Core domain types for Aegon. Not intended for direct use outside the workspace."
 
 [dependencies]

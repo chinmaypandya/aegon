@@ -3,6 +3,8 @@ name = "aegon-ui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Terminal UI for Aegon — live ratatui dashboard for Claude Code session events."
 
 [dependencies]
