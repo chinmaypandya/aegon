@@ -1,0 +1,23 @@
+[package]
+name = "aegon-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI entry point for Aegon — watches Claude Code session files and renders them live."
+
+[[bin]]
+name = "aegon"
+path = "src/main.rs"
+
+[dependencies]
+aegon-types = { workspace = true }
+aegon-adapters = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+notify = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dirs = { workspace = true }
