@@ -31,6 +31,11 @@ pub struct SessionState {
     pub flow: Vec<FlowNode>,
     /// Cumulative token usage across all assistant turns.
     pub token_totals: TokenTotals,
+    /// Token usage from the most recent assistant turn only.
+    ///
+    /// Useful for per-turn gauges that would be meaningless if shown
+    /// as a cumulative total across hundreds of turns.
+    pub last_turn_usage: Option<aegon_types::TokenUsage>,
     /// Auto-generated session title from the `ai-title` record, if seen.
     pub title: Option<String>,
     /// Total number of events ingested (for display).
@@ -87,6 +92,7 @@ impl SessionState {
             EventKind::AssistantMessage { usage, .. } => {
                 if let Some(u) = usage {
                     self.token_totals.add(u);
+                    self.last_turn_usage = Some(u.clone());
                 }
                 self.push_flow(FlowNode::Assistant);
             }
@@ -100,6 +106,10 @@ impl SessionState {
             }
 
             EventKind::UserMessage { .. } => {
+                // A new human turn means any still-pending tool calls will
+                // never receive results (the session moved on or was aborted).
+                // Resolve them as Done so they don't clog the Steps panel.
+                self.drain_orphaned_pending(event.timestamp);
                 self.push_flow(FlowNode::Human);
             }
 
@@ -123,6 +133,27 @@ impl SessionState {
     }
 
     // ── private helpers ──────────────────────────────────────────────────────
+
+    /// Move all still-pending steps to completed as `Done`.
+    ///
+    /// Called when a new human turn arrives, which means the previous round-trip
+    /// is finished and any unmatched tool calls were orphaned (aborted session,
+    /// reordered events, etc.).
+    fn drain_orphaned_pending(&mut self, now: chrono::DateTime<chrono::Utc>) {
+        let orphans: Vec<String> = self.pending.keys().cloned().collect();
+        for id in orphans {
+            if let Some(mut step) = self.pending.remove(&id) {
+                let duration_ms = match &step.status {
+                    StepStatus::Running { started_at } => {
+                        (now - started_at).num_milliseconds().max(0) as u64
+                    }
+                    _ => 0,
+                };
+                step.status = StepStatus::Done { duration_ms };
+                self.steps.push(step);
+            }
+        }
+    }
 
     /// Add a tool call to the flow, merging into an existing ToolGroup when
     /// the previous node shares the same parent_id (parallel dispatch).
