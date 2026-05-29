@@ -190,6 +190,8 @@ just branch feat/<name>
     → CI runs automatically
     → just merge
     → just cleanup <branch>
+    → write to a changelog file about features merged. (CHANGELOG.md)
+    → write to a JOURNAL.md file about features released, caveats, next steps and focus points.
 ```
 
 If CI fails: `/ci-debug` — or run `just ci` locally to reproduce exactly.
@@ -221,3 +223,24 @@ If CI fails: `/ci-debug` — or run `just ci` locally to reproduce exactly.
 - Every `pub` item must have a doc comment explaining its purpose — see `/clean-code`.
 - Adapters must never use `#[serde(deny_unknown_fields)]` on top-level event types — tool
   JSONL formats evolve without notice and the parser must not break on new fields.
+
+---
+
+## Changelog and Journal
+
+**`CHANGELOG.md`** and **`JOURNAL.md`** must be kept up to date as work lands on `main`.
+
+### CHANGELOG.md
+- Follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
+- Every PR that adds, changes, fixes, or removes user-facing behaviour must include a
+  `CHANGELOG.md` entry under `[Unreleased]`.
+- On release, `[Unreleased]` is renamed to `[x.y.z] — YYYY-MM-DD`.
+- Entries are grouped: `Added`, `Changed`, `Fixed`, `Removed`.
+
+### JOURNAL.md
+- Free-form running log of decisions, discoveries, and context that won't fit in a commit
+  message or changelog entry.
+- Each entry is dated `YYYY-MM-DD` and has a short title.
+- Must include at minimum: **achievements** (what shipped), **caveats** (known gaps or
+  limitations), and **next steps** (priority-ordered follow-up work).
+- New entries go at the top (newest first).
