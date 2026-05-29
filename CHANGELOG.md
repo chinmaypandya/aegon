@@ -11,6 +11,32 @@ Versions are dated `YYYY-MM-DD`. Unreleased work sits under `[Unreleased]`.
 
 ---
 
+## [0.2.0] — 2026-05-30
+
+### Added
+
+**`aegon-types`**
+- `EventKind::Thinking { text, signature }` — captures extended model reasoning blocks
+- `StreamId` enum (`Main` / `Sidechain`) — identifies whether an event belongs to the main session chain or a sub-agent run
+- `LogEvent.stream: StreamId` field — defaults to `Main`; set to `Sidechain` when `isSidechain: true` in the source record
+- `ToolMetadata` struct — supplementary execution metadata from the `toolUseResult` field: `stdout`, `stderr`, `interrupted`, `is_image`, `file_path`
+- `ToolResult.metadata: Option<ToolMetadata>` — attaches `ToolMetadata` when present
+
+**`aegon-adapters` (ClaudeAdapter)**
+- Parses `thinking` content blocks into `EventKind::Thinking`
+- Reads `isSidechain` and sets `LogEvent.stream` accordingly
+- Reads `toolUseResult` and populates `ToolResult.metadata`
+- Handles alternate `cache_creation` key in `usage` (falls back from `cache_creation_input_tokens`)
+
+**`aegon-ui`**
+- Renders `EventKind::Thinking` rows with `THINK` label in yellow
+- Prefixes sidechain events with `[S]` in the event list
+
+### Changed
+- `ToolResult` now has an additional `metadata: Option<ToolMetadata>` field (non-breaking: defaults to `None` when deserialised from older data)
+
+---
+
 ## [0.1.0] — 2026-05-30
 
 ### Added

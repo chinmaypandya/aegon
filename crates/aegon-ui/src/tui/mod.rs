@@ -5,7 +5,7 @@
 //! `Esc` to quit.
 
 use crate::app::App;
-use aegon_types::{EventKind, LogEvent};
+use aegon_types::{EventKind, LogEvent, StreamId};
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyCode},
@@ -148,13 +148,21 @@ fn format_event(e: &LogEvent) -> Line<'static> {
                 u.input_tokens, u.output_tokens, u.cache_read_input_tokens
             ),
         ),
+        EventKind::Thinking { text, .. } => ("THINK", Color::Yellow, truncate(text, 80)),
         EventKind::Unknown => ("???? ", Color::DarkGray, String::new()),
+    };
+
+    // Prefix sidechain events so they are visually subordinate to the main chain.
+    let stream_prefix = if e.stream == StreamId::Sidechain {
+        "[S] "
+    } else {
+        ""
     };
 
     Line::from(vec![
         Span::styled(format!("{ts} "), Style::default().fg(Color::DarkGray)),
         Span::styled(
-            format!("{label} "),
+            format!("{stream_prefix}{label} "),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
         Span::raw(detail),

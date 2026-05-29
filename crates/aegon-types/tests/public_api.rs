@@ -3,7 +3,7 @@
 //! These tests import only through the crate's public surface to catch
 //! accidental breakage of the external interface.
 
-use aegon_types::{EventKind, LogEvent, Session, TokenUsage, ToolCall, ToolResult};
+use aegon_types::{EventKind, LogEvent, Session, StreamId, TokenUsage, ToolCall, ToolResult};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -13,6 +13,7 @@ fn make_log_event(kind: EventKind) -> LogEvent {
         session_id: Uuid::new_v4(),
         parent_id: None,
         timestamp: Utc::now(),
+        stream: StreamId::Main,
         kind,
     }
 }
@@ -34,6 +35,7 @@ fn log_event_with_tool_result_is_constructible() {
         tool_use_id: "tc1".into(),
         content: "file.txt".into(),
         is_error: false,
+        metadata: None,
     };
     let event = make_log_event(EventKind::ToolResult(tr));
     assert!(matches!(event.kind, EventKind::ToolResult(_)));

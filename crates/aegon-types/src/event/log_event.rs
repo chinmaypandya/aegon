@@ -1,6 +1,7 @@
 //! The central event record that flows through the Aegon pipeline.
 
 use crate::event::EventKind;
+use crate::StreamId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -9,8 +10,9 @@ use uuid::Uuid;
 ///
 /// `session_id` groups all events that belong to the same run.
 /// `parent_id` links each event to the one that caused it, forming a chain
-/// that can be replayed deterministically. The `kind` field carries the actual
-/// payload; everything else is observability metadata.
+/// that can be replayed deterministically. `stream` separates main-chain
+/// events from sub-agent sidechains. The `kind` field carries the payload;
+/// everything else is observability metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogEvent {
     /// Unique identifier for this event.
@@ -21,6 +23,9 @@ pub struct LogEvent {
     pub parent_id: Option<Uuid>,
     /// Wall-clock time the event was recorded.
     pub timestamp: DateTime<Utc>,
+    /// Whether this event is part of the main session chain or a sub-agent sidechain.
+    #[serde(default)]
+    pub stream: StreamId,
     /// What this event represents.
     pub kind: EventKind,
 }

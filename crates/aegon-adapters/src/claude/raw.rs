@@ -23,13 +23,18 @@ pub struct RawRecord {
     /// Session ID — present on `queue-operation` lines at the top level.
     #[serde(rename = "sessionId")]
     pub session_id_field: Option<String>,
+    /// Whether this record originated in a sub-agent sidechain.
+    #[serde(rename = "isSidechain", default)]
+    pub is_sidechain: bool,
     /// Message body for `user` and `assistant` records.
     pub message: Option<RawMessage>,
+    /// Supplementary execution metadata on `user` records with tool results.
+    #[serde(rename = "toolUseResult")]
+    pub tool_use_result: Option<RawToolUseResult>,
 }
 
 impl RawRecord {
-    /// Extract the session UUID, preferring the top-level `sessionId` field
-    /// and falling back to parsing `uuid` as a session hint.
+    /// Extract the session UUID from the top-level `sessionId` field.
     pub fn session_id(&self) -> Option<Uuid> {
         self.session_id_field
             .as_deref()
@@ -47,7 +52,7 @@ pub struct RawMessage {
 /// One item in a `message.content` array.
 ///
 /// Tagged by the `type` field. Unknown variants are captured by `Other` so
-/// new content types (e.g. `"thinking"`) don't cause parse failures.
+/// new content types don't cause parse failures.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RawContent {
@@ -66,6 +71,10 @@ pub enum RawContent {
         content: Value,
         is_error: Option<bool>,
     },
+    Thinking {
+        thinking: String,
+        signature: Option<String>,
+    },
     #[serde(other)]
     Other,
 }
@@ -79,6 +88,32 @@ pub struct RawUsage {
     pub output_tokens: u64,
     #[serde(default)]
     pub cache_read_input_tokens: u64,
+    /// Primary cache creation key.
     #[serde(default)]
     pub cache_creation_input_tokens: u64,
+    /// Alternate cache creation key seen on some responses.
+    #[serde(default)]
+    pub cache_creation: u64,
+}
+
+/// Supplementary execution metadata written to `toolUseResult` on `user` records.
+///
+/// Shape varies by tool — shell tools carry `stdout`/`stderr`; file tools
+/// carry a nested `file` object with `filePath`.
+#[derive(Debug, Deserialize)]
+pub struct RawToolUseResult {
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
+    #[serde(default)]
+    pub interrupted: bool,
+    #[serde(rename = "isImage", default)]
+    pub is_image: bool,
+    pub file: Option<RawToolFile>,
+}
+
+/// File metadata inside a `toolUseResult` for Read/Write tools.
+#[derive(Debug, Deserialize)]
+pub struct RawToolFile {
+    #[serde(rename = "filePath")]
+    pub file_path: Option<String>,
 }

@@ -7,9 +7,11 @@
 mod raw;
 
 use crate::Adapter;
-use aegon_types::{EventKind, LogEvent, Result, TokenUsage, ToolCall, ToolResult};
+use aegon_types::{
+    EventKind, LogEvent, Result, StreamId, TokenUsage, ToolCall, ToolMetadata, ToolResult,
+};
 use chrono::DateTime;
-use raw::{RawContent, RawRecord};
+use raw::{RawContent, RawRecord, RawToolUseResult};
 use uuid::Uuid;
 
 /// Adapter for Claude Code session JSONL files.
@@ -24,6 +26,11 @@ impl Adapter for ClaudeAdapter {
             })?;
 
         let session_id = record.session_id().unwrap_or_else(Uuid::new_v4);
+        let stream = if record.is_sidechain {
+            StreamId::Sidechain
+        } else {
+            StreamId::Main
+        };
 
         let event_id = record
             .uuid
@@ -38,6 +45,7 @@ impl Adapter for ClaudeAdapter {
             .map(|dt| dt.with_timezone(&chrono::Utc))
             .unwrap_or_else(chrono::Utc::now);
 
+        let tool_use_result = record.tool_use_result;
         let mut events = Vec::new();
 
         match record.record_type.as_deref() {
@@ -47,7 +55,12 @@ impl Adapter for ClaudeAdapter {
                         input_tokens: u.input_tokens,
                         output_tokens: u.output_tokens,
                         cache_read_input_tokens: u.cache_read_input_tokens,
-                        cache_creation_input_tokens: u.cache_creation_input_tokens,
+                        // Prefer the explicit key; fall back to the alternate.
+                        cache_creation_input_tokens: if u.cache_creation_input_tokens > 0 {
+                            u.cache_creation_input_tokens
+                        } else {
+                            u.cache_creation
+                        },
                     });
 
                     let mut text_parts: Vec<String> = Vec::new();
@@ -61,7 +74,24 @@ impl Adapter for ClaudeAdapter {
                                     session_id,
                                     Some(event_id),
                                     timestamp,
+                                    stream,
                                     EventKind::ToolCall(ToolCall { id, name, input }),
+                                ));
+                            }
+                            RawContent::Thinking {
+                                thinking,
+                                signature,
+                            } => {
+                                events.push(make_event(
+                                    Uuid::new_v4(),
+                                    session_id,
+                                    Some(event_id),
+                                    timestamp,
+                                    stream,
+                                    EventKind::Thinking {
+                                        text: thinking,
+                                        signature,
+                                    },
                                 ));
                             }
                             _ => {}
@@ -74,6 +104,7 @@ impl Adapter for ClaudeAdapter {
                             session_id,
                             parent_id,
                             timestamp,
+                            stream,
                             EventKind::AssistantMessage {
                                 content: text_parts.join("\n"),
                                 usage,
@@ -93,6 +124,7 @@ impl Adapter for ClaudeAdapter {
                                     session_id,
                                     parent_id,
                                     timestamp,
+                                    stream,
                                     EventKind::UserMessage { content: text },
                                 ));
                             }
@@ -101,15 +133,18 @@ impl Adapter for ClaudeAdapter {
                                 content,
                                 is_error,
                             } => {
+                                let metadata = tool_use_result.as_ref().map(build_tool_metadata);
                                 events.push(make_event(
                                     Uuid::new_v4(),
                                     session_id,
                                     Some(event_id),
                                     timestamp,
+                                    stream,
                                     EventKind::ToolResult(ToolResult {
                                         tool_use_id,
                                         content: flatten_content(content),
                                         is_error: is_error.unwrap_or(false),
+                                        metadata,
                                     }),
                                 ));
                             }
@@ -119,7 +154,7 @@ impl Adapter for ClaudeAdapter {
                 }
             }
 
-            // queue-operation, summary, and future types — no observable signal
+            // queue-operation, summary, attachment, and future types — no observable signal
             _ => {}
         }
 
@@ -132,6 +167,7 @@ fn make_event(
     session_id: Uuid,
     parent_id: Option<Uuid>,
     timestamp: chrono::DateTime<chrono::Utc>,
+    stream: StreamId,
     kind: EventKind,
 ) -> LogEvent {
     LogEvent {
@@ -139,7 +175,18 @@ fn make_event(
         session_id,
         parent_id,
         timestamp,
+        stream,
         kind,
+    }
+}
+
+fn build_tool_metadata(raw: &RawToolUseResult) -> ToolMetadata {
+    ToolMetadata {
+        stdout: raw.stdout.clone(),
+        stderr: raw.stderr.clone(),
+        interrupted: raw.interrupted,
+        is_image: raw.is_image,
+        file_path: raw.file.as_ref().and_then(|f| f.file_path.clone()),
     }
 }
 
@@ -231,12 +278,13 @@ mod tests {
             }
         }"#;
         let events = adapter().parse_line(line).unwrap();
-        // Expect one ToolCall + one AssistantMessage
         assert_eq!(events.len(), 2);
         let has_tool_call = events
             .iter()
             .any(|e| matches!(&e.kind, EventKind::ToolCall(tc) if tc.name == "Bash"));
-        let has_message = events.iter().any(|e| matches!(&e.kind, EventKind::AssistantMessage { content, .. } if content.contains("I will run bash")));
+        let has_message = events.iter().any(
+            |e| matches!(&e.kind, EventKind::AssistantMessage { content, .. } if content.contains("I will run bash")),
+        );
         assert!(has_tool_call);
         assert!(has_message);
     }
@@ -264,6 +312,108 @@ mod tests {
         let usage = msg.expect("should have usage");
         assert_eq!(usage.input_tokens, 20);
         assert_eq!(usage.cache_read_input_tokens, 7);
+    }
+
+    #[test]
+    fn thinking_block_produces_thinking_event() {
+        let line = r#"{
+            "type":"assistant",
+            "uuid":"00000000-0000-0000-0000-000000000006",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "message":{
+                "role":"assistant",
+                "content":[
+                    {"type":"thinking","thinking":"I should use ls","signature":"sig123"},
+                    {"type":"text","text":"ok"}
+                ]
+            }
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        let thinking = events
+            .iter()
+            .find(|e| matches!(&e.kind, EventKind::Thinking { .. }));
+        assert!(thinking.is_some(), "expected a Thinking event");
+        match &thinking.unwrap().kind {
+            EventKind::Thinking { text, signature } => {
+                assert_eq!(text, "I should use ls");
+                assert_eq!(signature.as_deref(), Some("sig123"));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn sidechain_record_sets_stream_to_sidechain() {
+        let line = r#"{
+            "type":"assistant",
+            "isSidechain":true,
+            "uuid":"00000000-0000-0000-0000-000000000007",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "message":{"role":"assistant","content":[{"type":"text","text":"sub"}]}
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert!(!events.is_empty());
+        assert_eq!(events[0].stream, StreamId::Sidechain);
+    }
+
+    #[test]
+    fn main_chain_record_sets_stream_to_main() {
+        let line = r#"{
+            "type":"assistant",
+            "isSidechain":false,
+            "uuid":"00000000-0000-0000-0000-000000000008",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "message":{"role":"assistant","content":[{"type":"text","text":"main"}]}
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert!(!events.is_empty());
+        assert_eq!(events[0].stream, StreamId::Main);
+    }
+
+    #[test]
+    fn tool_result_with_tool_use_result_metadata_is_enriched() {
+        let line = r#"{
+            "type":"user",
+            "uuid":"00000000-0000-0000-0000-000000000009",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "toolUseResult":{"stdout":"file.txt","stderr":"","interrupted":false,"isImage":false},
+            "message":{"content":[{
+                "type":"tool_result",
+                "tool_use_id":"t1",
+                "content":"file.txt"
+            }]}
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        if let EventKind::ToolResult(tr) = &events[0].kind {
+            let meta = tr.metadata.as_ref().expect("metadata should be present");
+            assert_eq!(meta.stdout.as_deref(), Some("file.txt"));
+            assert!(!meta.interrupted);
+        } else {
+            panic!("expected ToolResult");
+        }
+    }
+
+    #[test]
+    fn alternate_cache_creation_key_is_read() {
+        let line = r#"{
+            "type":"assistant",
+            "uuid":"00000000-0000-0000-0000-000000000010",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "message":{
+                "role":"assistant",
+                "content":[{"type":"text","text":"ok"}],
+                "usage":{"input_tokens":5,"output_tokens":2,"cache_creation":3}
+            }
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        let usage = events.iter().find_map(|e| {
+            if let EventKind::AssistantMessage { usage, .. } = &e.kind {
+                usage.as_ref()
+            } else {
+                None
+            }
+        });
+        assert_eq!(usage.unwrap().cache_creation_input_tokens, 3);
     }
 
     // ── parse_line error path ────────────────────────────────────────────────

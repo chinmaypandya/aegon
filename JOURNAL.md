@@ -55,6 +55,43 @@ These are known limitations as of v0.1.0, grounded in the JSONL audit:
 
 ---
 
+## 2026-05-30 — v0.2.0: adapter gap fixes (thinking, sidechain, tool metadata)
+
+### What was built
+
+- `EventKind::Thinking` — extended model reasoning now visible in the TUI (yellow `THINK` rows)
+- `StreamId` on every `LogEvent` — main-chain vs sidechain events are now separated; TUI prefixes sidechain rows with `[S]`
+- `ToolMetadata` on `ToolResult` — `stdout`, `stderr`, `interrupted`, `file_path` from `toolUseResult` are now captured
+- `cache_creation` alternate key handled — cache creation tokens no longer undercounted on responses that use the shorter key
+
+### Caveats remaining
+
+Gaps 4–8 from the original list are still open:
+4. `agentId` / `attributionSkill` not yet captured on `LogEvent`
+5. `usage.server_tool_use`, `service_tier`, `speed` not yet in `TokenUsage`
+6. Session metadata (`cwd`, `gitBranch`, `version`, `ai-title`) not yet captured
+7. `aegon-db` not yet built — no persistence between runs
+8. `aegon history` / `aegon replay` commands not yet implemented
+
+### Next steps
+
+Continue down the journal priority list: gaps 4 (`agentId`/`attributionSkill`) and 5 (extended `TokenUsage` fields) are small and belong in the same PR. Gap 6 (session metadata) follows. Gaps 7–8 are larger and will each need their own branch.
+
+---
+
+## 2026-05-30 — toolUseResult is supplementary, not an alternate path
+
+**Correction to gap #1 in the next-steps list.**
+
+Investigated 518 real `toolUseResult` records. In every case, `message.content` also contains the corresponding `tool_result` block — they are never mutually exclusive. `toolUseResult` is **supplementary metadata** about how the tool ran:
+
+- Bash: `{ stdout, stderr, interrupted, isImage, noOutputExpected }`
+- Read/Write: `{ type, file: { filePath, content } }`
+
+This means there is no silent data loss from the tool_result path. The fix is to **enrich `ToolResult`** with this structured metadata rather than treating it as an alternate parse path.
+
+---
+
 ## 2026-05-30 — JSONL format discovery
 
 Ran `audit.py` across all `~/.claude/projects/**/*.jsonl` for the first time.
