@@ -1,5 +1,51 @@
 # aegon Justfile
 # Run `just --list` to see all targets.
+#
+# Quick start:
+#   just setup    — install all system and cargo dependencies
+#   just run      — launch the live TUI watcher
+#   just watch    — alias for run (opens in the current terminal)
+#   just demo     — launch in a new macOS Terminal window
+
+# ── Setup and dependencies ──────────────────────────────────────────────────────
+
+# Install all system and Cargo tools required to develop and run Aegon
+setup: install-sys-deps install-cargo-tools
+    @echo "✓ All dependencies installed — run 'just run' to start Aegon"
+
+# Install system dependencies via Homebrew (macOS)
+# Requires: https://brew.sh
+install-sys-deps:
+    @which brew > /dev/null || (echo "Error: Homebrew not found. Install from https://brew.sh" && exit 1)
+    brew install tmux gh just
+    @echo "✓ System deps ready (tmux, gh, just)"
+
+# Install Cargo tools used in development and CI
+install-cargo-tools:
+    cargo install cargo-outdated --locked
+    cargo install cargo-audit --locked
+    @echo "✓ Cargo tools ready (cargo-outdated, cargo-audit)"
+
+# ── Entry points ────────────────────────────────────────────────────────────────
+
+# Launch the Aegon live TUI watcher in the current terminal
+# Watches ~/.claude/projects/**/*.jsonl — start a Claude Code session to see events
+run: build
+    ./target/debug/aegon
+
+# Alias: same as run
+watch: run
+
+# Launch Aegon in a new macOS Terminal window (background — keeps this shell free)
+demo: build
+    osascript -e 'tell application "Terminal" to do script "{{justfile_directory()}}/target/debug/aegon"'
+    @echo "Aegon launched in a new Terminal window"
+
+# Run the JSONL audit script against ~/.claude/projects (requires Python 3)
+audit-jsonl:
+    python3 examples/jsonl/audit.py
+
+
 
 # ── Git workflow ────────────────────────────────────────────────────────────────
 
