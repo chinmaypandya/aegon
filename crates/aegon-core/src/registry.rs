@@ -11,8 +11,8 @@ use uuid::Uuid;
 
 /// Owns and routes events to per-session state.
 ///
-/// The typical call pattern is: receive a [`LogEvent`] from the watcher
-/// channel, call [`ingest`], then read from [`sessions`] or [`latest`] to
+/// The typical call pattern is: receive a [`aegon_types::LogEvent`] from the watcher
+/// channel, call [`Self::ingest`], then read from [`Self::sessions`] or [`Self::latest`] to
 /// refresh the dashboard.
 #[derive(Debug, Default)]
 pub struct SessionRegistry {

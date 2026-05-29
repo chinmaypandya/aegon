@@ -1,6 +1,6 @@
 //! Pure session-state and flow logic for Aegon.
 //!
-//! This crate has no I/O and no storage. It receives [`LogEvent`]s and
+//! This crate has no I/O and no storage. It receives [`aegon_types::LogEvent`]s and
 //! maintains live [`SessionState`] per session — tracking running tool
 //! calls, timing, token totals, and causal flow. Everything a dashboard
 //! needs to render is produced here.

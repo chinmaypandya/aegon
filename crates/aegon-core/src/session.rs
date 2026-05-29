@@ -1,7 +1,7 @@
 //! Live state for a single Claude Code session.
 //!
 //! [`SessionState`] is the heart of `aegon-core`. It owns no I/O — callers
-//! feed it [`LogEvent`]s one at a time via [`ingest`] and read back whatever
+//! feed it [`aegon_types::LogEvent`]s one at a time via [`SessionState::ingest`] and read back whatever
 //! the dashboard needs through its public fields and methods.
 
 use crate::flow::FlowNode;
@@ -15,7 +15,7 @@ use uuid::Uuid;
 ///
 /// Tracks running tool calls, completed step history, cumulative token
 /// usage, and the ordered causal flow for visualization. Feed events via
-/// [`ingest`]; read state through the public fields and helper methods.
+/// [`SessionState::ingest`]; read state through the public fields and helper methods.
 #[derive(Debug, Default)]
 pub struct SessionState {
     /// Unique session identifier — matches `LogEvent.session_id`.

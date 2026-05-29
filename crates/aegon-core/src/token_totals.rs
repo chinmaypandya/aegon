@@ -4,7 +4,7 @@ use aegon_types::TokenUsage;
 
 /// Running token totals for one session, accumulated across every assistant turn.
 ///
-/// Use [`add`] each time a [`TokenUsage`] arrives. The `total` method gives
+/// Use [`Self::add`] each time a [`aegon_types::TokenUsage`] arrives. The `total` method gives
 /// the combined input+output count for progress-bar rendering.
 #[derive(Debug, Clone, Default)]
 pub struct TokenTotals {

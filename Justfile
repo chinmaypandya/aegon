@@ -160,9 +160,9 @@ test-verbose:
 docs:
     cargo doc --workspace --no-deps --open
 
-# Build docs without opening (used by CI)
+# Build docs without opening — mirrors CI: broken intra-doc links are errors
 docs-check:
-    cargo doc --workspace --no-deps
+    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
 # ── CI: local mirror ────────────────────────────────────────────────────────────
 

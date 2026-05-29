@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 /// One tool invocation tracked through its full lifecycle.
 ///
-/// Created when a [`ToolCall`] event arrives; updated to [`StepStatus::Done`]
-/// or [`StepStatus::Failed`] when the matching [`ToolResult`] is ingested.
+/// Created when a [`aegon_types::ToolCall`] event arrives; updated to [`StepStatus::Done`]
+/// or [`StepStatus::Failed`] when the matching [`aegon_types::ToolResult`] is ingested.
 #[derive(Debug, Clone)]
 pub struct Step {
     /// Matches `ToolCall.id` / `ToolResult.tool_use_id`.
