@@ -120,6 +120,7 @@ fn sentinel_check() -> LogEvent {
         session_id: uuid::Uuid::nil(),
         parent_id: None,
         timestamp: chrono::Utc::now(),
+        stream: aegon_types::StreamId::Main,
         kind: aegon_types::EventKind::Unknown,
     }
 }

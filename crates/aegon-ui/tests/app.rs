@@ -2,7 +2,7 @@
 //!
 //! Verifies the rolling event buffer behaviour from outside the crate.
 
-use aegon_types::{EventKind, LogEvent};
+use aegon_types::{EventKind, LogEvent, StreamId};
 use aegon_ui::app::App;
 use chrono::Utc;
 use uuid::Uuid;
@@ -13,6 +13,7 @@ fn dummy_event() -> LogEvent {
         session_id: Uuid::new_v4(),
         parent_id: None,
         timestamp: Utc::now(),
+        stream: StreamId::Main,
         kind: EventKind::UserMessage {
             content: "hi".into(),
         },

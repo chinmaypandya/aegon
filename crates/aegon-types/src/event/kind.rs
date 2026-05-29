@@ -25,6 +25,16 @@ pub enum EventKind {
     UserMessage { content: String },
     /// Token usage reported as a standalone event (some providers emit it separately).
     TokenUsage(TokenUsage),
+    /// Extended thinking produced by the model before its response.
+    ///
+    /// Only present when the model uses extended thinking mode. The `text`
+    /// field contains the raw reasoning; `signature` is an opaque integrity
+    /// token produced by the API.
+    Thinking {
+        text: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        signature: Option<String>,
+    },
     /// An event type not yet handled by this version of Aegon.
     #[serde(other)]
     Unknown,
@@ -54,6 +64,7 @@ mod tests {
             tool_use_id: "id1".into(),
             content: "ok".into(),
             is_error: false,
+            metadata: None,
         });
         let json = serde_json::to_string(&kind).unwrap();
         let back: EventKind = serde_json::from_str(&json).unwrap();
