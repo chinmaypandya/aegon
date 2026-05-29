@@ -9,7 +9,7 @@ use serde_json::Value;
 /// the tool's own argument type without the types crate knowing tool schemas.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolCall {
-    /// Stable ID used to match this call with its [`ToolResult`].
+    /// Stable ID used to match this call with its [`crate::ToolResult`].
     pub id: String,
     /// Tool name as declared in the tool list (e.g. `"Bash"`, `"Read"`).
     pub name: String,

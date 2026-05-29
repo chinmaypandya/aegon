@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 /// One Claude Code agentic session, identified by the JSONL file it came from.
 ///
-/// A session groups all [`LogEvent`]s that share the same `session_id`. The
+/// A session groups all [`crate::LogEvent`]s that share the same `session_id`. The
 /// `path` field is the source JSONL file so events can be reloaded from disk.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Session {

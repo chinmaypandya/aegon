@@ -2,13 +2,13 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Output produced by running a [`ToolCall`].
+/// Output produced by running a [`crate::ToolCall`].
 ///
 /// `is_error` reflects a tool-level failure (e.g. command exited non-zero),
 /// not a parse error in the adapter.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolResult {
-    /// ID of the [`ToolCall`] this result corresponds to.
+    /// ID of the [`crate::ToolCall`] this result corresponds to.
     pub tool_use_id: String,
     /// Output text returned by the tool.
     pub content: String,
