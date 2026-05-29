@@ -3,8 +3,6 @@
 //! Starts the file watcher and the ratatui TUI, wiring them together via a
 //! channel so the watcher thread can push new events into the UI loop.
 
-mod app;
-mod tui;
 mod watcher;
 
 use anyhow::Result;
@@ -21,7 +19,7 @@ async fn main() -> Result<()> {
     });
 
     // Run the TUI on the main thread (crossterm requires it).
-    tui::run(rx)?;
+    aegon_ui::tui::run(rx)?;
 
     // Watcher thread exits when the channel sender is dropped (TUI closed).
     let _ = watcher_handle.join();

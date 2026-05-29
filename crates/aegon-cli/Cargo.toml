@@ -12,11 +12,10 @@ path = "src/main.rs"
 [dependencies]
 aegon-types = { workspace = true }
 aegon-adapters = { workspace = true }
+aegon-ui = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 notify = { workspace = true }
-ratatui = { workspace = true }
-crossterm = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }

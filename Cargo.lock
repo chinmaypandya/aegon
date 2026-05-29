@@ -20,12 +20,11 @@ version = "0.1.0"
 dependencies = [
  "aegon-adapters",
  "aegon-types",
+ "aegon-ui",
  "anyhow",
  "chrono",
- "crossterm",
  "dirs",
  "notify",
- "ratatui",
  "serde_json",
  "tokio",
  "uuid",
@@ -40,6 +39,17 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "uuid",
+]
+
+[[package]]
+name = "aegon-ui"
+version = "0.1.0"
+dependencies = [
+ "aegon-types",
+ "anyhow",
+ "crossterm",
+ "ratatui",
+ "serde_json",
 ]
 
 [[package]]
