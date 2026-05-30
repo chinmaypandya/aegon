@@ -5,6 +5,30 @@ Entries are dated `YYYY-MM-DD`, newest first.
 
 ---
 
+## 2026-05-30 — v0.4.0: published to crates.io and PyPI
+
+### Achievements
+
+- All five crates published to crates.io in dependency order: `aegon-types` → `aegon-core` + `aegon-adapters` → `aegon-ui` → `aegon-cli`
+- `aegon-rs 0.1.0` published to PyPI via maturin — ships the native ARM64/x86 binary in a platform wheel, no Rust toolchain needed by end users
+- `aegon run --detached` added — opens the TUI in a new terminal window; cross-platform (macOS + Linux terminal emulator detection)
+- Install is now `pip install aegon-rs` or `cargo install aegon-cli`; verified end-to-end by installing from PyPI and running
+
+### Caveats
+
+- **PyPI name collision**: `aegon` was taken by an unrelated package; shipped as `aegon-rs` instead — the standard convention for Rust-backed Python packages
+- **Platform wheels only**: maturin currently builds for the host platform only (macOS arm64 in this case). Linux/Windows users need to build from source or wait for CI-based multi-platform wheel builds
+- **Token auth**: maturin publish requires `MATURIN_PYPI_TOKEN` env var; username/password rejected by PyPI
+- **`--detached` on Linux**: terminal emulator detection is best-effort; no fallback if none of the five tried are installed
+
+### Next steps
+
+- Set up GitHub Actions to build and publish multi-platform wheels (Linux x86_64, macOS arm64/x86_64, Windows) on release tag
+- Consider a Homebrew tap as a third install path
+- Continue working down the adapter gap list (items 4–8 from the original JSONL audit)
+
+---
+
 ## 2026-05-30 — v0.1.0 shipped: live TUI watcher
 
 ### What was built
