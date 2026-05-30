@@ -3,7 +3,7 @@ requires = ["maturin>=1.4,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "aegon"
+name = "aegon-rs"
 version = "0.1.0"
 description = "Observability for Claude Code agentic runs — live TUI dashboard for Claude Code sessions"
 license = {text = "MIT OR Apache-2.0"}
