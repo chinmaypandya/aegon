@@ -189,3 +189,13 @@ outdated:
 # Audit dependencies for known vulnerabilities
 audit:
     cargo audit
+
+# ── PyPI (maturin) ──────────────────────────────────────────────────────────────
+
+# Build a pip-installable wheel (output: target/wheels/)
+pip-build:
+    maturin build --release
+
+# Publish to PyPI via maturin (requires `maturin` and PyPI credentials)
+pip-publish:
+    maturin publish
