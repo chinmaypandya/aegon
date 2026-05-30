@@ -102,8 +102,7 @@ jobs:
           command: publish
           target: ${{ matrix.target }}
           manylinux: auto
-          # Upload sdist only from Linux x86_64 to avoid duplicates
-          args: ${{ matrix.target == 'x86_64' && matrix.os == 'ubuntu-latest' && '--sdist' || '--no-sdist' }}
+          args: --no-sdist
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.MATURIN_PYPI_TOKEN }}
 
