@@ -1,0 +1,31 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "aegon"
+version = "0.1.0"
+description = "Observability for Claude Code agentic runs — live TUI dashboard for Claude Code sessions"
+license = {text = "MIT OR Apache-2.0"}
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["claude", "claude-code", "observability", "tui", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/chinmaypandya/aegon"
+Repository = "https://github.com/chinmaypandya/aegon"
+
+[tool.maturin]
+# Ship the aegon binary — no Python extension module needed.
+manifest-path = "crates/aegon-cli/Cargo.toml"
+binaries = ["aegon"]
