@@ -11,6 +11,22 @@ Versions are dated `YYYY-MM-DD`. Unreleased work sits under `[Unreleased]`.
 
 ---
 
+## [0.4.0] — 2026-05-30
+
+### Added
+
+- **`pip install aegon-rs`** — Aegon is now available on PyPI via maturin. Ships the native binary in a platform wheel; no Rust toolchain required.
+- **`aegon run --detached`** — opens the TUI in a new terminal window instead of the current one. macOS uses `osascript`/Terminal.app; Linux tries `gnome-terminal`, `xterm`, `konsole`, `alacritty`, `kitty` in order.
+- **`aegon run`** — explicit subcommand; bare `aegon` still works as an alias.
+- **`just pip-build`** / **`just pip-publish`** — Justfile recipes for building and publishing the PyPI wheel via maturin.
+- `clap` added to `aegon-cli` for argument parsing.
+
+### Published
+- `aegon-rs 0.1.0` on PyPI — `pip install aegon-rs`
+- `aegon-types 0.1.0`, `aegon-core 0.1.0`, `aegon-adapters 0.1.0`, `aegon-ui 0.1.0`, `aegon-cli 0.1.0` on crates.io — `cargo install aegon-cli`
+
+---
+
 ## [0.3.2] — 2026-05-30
 
 ### Fixed

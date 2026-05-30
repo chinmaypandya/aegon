@@ -94,26 +94,28 @@ Right panel — **live dashboard**:
 
 ---
 
+## Install
+
+**Via pip** (no Rust toolchain needed):
+
+```bash
+pip install aegon-rs
+```
+
+**Via Cargo** (Rust toolchain required):
+
+```bash
+cargo install aegon-cli
+```
+
+---
+
 ## Running
 
-**Quickest start — opens in a new Terminal window:**
-
 ```bash
-just demo
-```
-
-**In your current terminal:**
-
-```bash
-just run          # build + launch in one step
-just watch        # alias for run
-```
-
-**Manual:**
-
-```bash
-cargo build --workspace
-./target/debug/aegon
+aegon run              # TUI in the current terminal
+aegon run --detached   # open TUI in a new terminal window
+aegon                  # same as aegon run
 ```
 
 Press `q` or `Esc` to quit.
@@ -122,10 +124,12 @@ The watcher automatically picks up `~/.claude/projects/**/*.jsonl` and
 `~/.claude/sessions/**/*.jsonl`. Start a Claude Code session in another
 terminal — events appear in real time.
 
-**First time setup** (installs system deps and Cargo tools):
+**From source** (contributors):
 
 ```bash
-just setup
+just run          # build + launch in one step
+just demo         # opens in a new Terminal window
+just setup        # first-time: installs system deps and Cargo tools
 ```
 
 ---
