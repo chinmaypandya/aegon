@@ -36,7 +36,7 @@ Features written
        ▼ (APPROVE)
 /unit-testing (this skill → unit-testing agent)
        │
-       ├─ Tests green ──► /lint-check
+       ├─ Tests green ──► /lint-check ──► /documentation ──► commit
        │
        └─ Bug in prod code ──► report to implementer → fix → re-run
 ```
@@ -53,7 +53,7 @@ Features written
 ## Handoff
 
 The `unit-testing` agent runs all phases. When it completes:
-- Tests green → proceed to `/lint-check`.
+- Tests green → proceed to `/lint-check`, then `/documentation`, then commit.
 - Bug reported → implementer fixes production code → re-invoke this skill.
 - After 5 failed iterations → halt and review with user.
 

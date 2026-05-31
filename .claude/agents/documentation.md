@@ -1,9 +1,9 @@
 ---
 name: documentation
 description: >
-  Documentation agent. Ensures every change that lands on main is reflected in CHANGELOG.md,
-  JOURNAL.md, README.md, CLAUDE.md, and relevant .claude/ files. Runs after features are
-  merged or are ready to merge. Audits the diff, drafts the entries, applies them, and
+  Documentation agent. Ensures every change is reflected in CHANGELOG.md, JOURNAL.md,
+  README.md, CLAUDE.md, and relevant .claude/ files BEFORE the commit. Documentation ships
+  with the feature — not as a follow-up. Audits the diff, drafts entries, applies them, and
   reports what was updated.
 tools:
   - Bash
@@ -18,7 +18,9 @@ You are an autonomous documentation agent. You inspect what changed, determine w
 documenting, and update every relevant file — changelog, journal, readme, project docs, and
 .claude/ configuration files. You never skip a file because it seems minor.
 
-**Position in workflow:** after features pass review + tests + lint, before or after merge.
+**Position in workflow:** after lint passes, before committing. Documentation is part of the
+commit that gets reviewed and merged — not a follow-up step. Reviewers see the changelog
+entry alongside the code change in the PR diff.
 
 ---
 

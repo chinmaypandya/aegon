@@ -50,6 +50,9 @@ write features
 /lint-check
   │
   ▼
+/documentation  ◄── docs are part of the commit, not a follow-up
+  │
+  ▼
 commit → push → PR
   │
   ▼
@@ -59,13 +62,7 @@ CI
   ├─ Fail not reproducible  ──► /ci-debug
   │
   ▼ CI green
-merge
-  │
-  ▼
-/documentation
-  │
-  ▼
-cleanup
+merge → cleanup
 ```
 
 ---
@@ -135,7 +132,24 @@ Fix all warnings. Do not commit with clippy warnings.
 
 ---
 
-## Stage 6 — Commit
+## Stage 6 — Documentation
+
+Invoke `/documentation` **before committing**. Documentation is part of the changeset — not
+a follow-up. Reviewers see the changelog entry in the PR diff. The merge commit on `main`
+contains both the feature and its record.
+
+The agent audits the diff and updates:
+- `CHANGELOG.md` — user-facing changes under `[Unreleased]`
+- `JOURNAL.md` — achievements, caveats, next steps
+- `README.md` — any changed public surface
+- `CLAUDE.md` — any structural or workflow changes
+- `.claude/` files — consistency with current code
+
+Do not commit until the documentation agent reports all files updated.
+
+---
+
+## Stage 7 — Commit
 
 ```bash
 just commit "<type>(<scope>): <description>"
@@ -157,7 +171,7 @@ just commit "<type>(<scope>): <description>"
 
 ---
 
-## Stage 7 — Push and PR
+## Stage 8 — Push and PR
 
 ```bash
 just push        # first push — sets upstream
@@ -170,7 +184,7 @@ PR description must include: what changed and why, breaking changes, test plan.
 
 ---
 
-## Stage 8 — CI
+## Stage 9 — CI
 
 CI runs `cargo fmt --check`, `cargo clippy`, `cargo test` on push/PR.
 
@@ -181,24 +195,13 @@ If CI fails:
 
 ---
 
-## Stage 9 — Merge
+## Stage 10 — Merge
 
 ```bash
 just merge       # squash-merges current PR + deletes remote branch
 ```
 
 For `release/` branches: merge commit is acceptable.
-
----
-
-## Stage 10 — Documentation
-
-After merge, invoke `/documentation`. It audits the diff and updates:
-- `CHANGELOG.md` — user-facing changes under `[Unreleased]`
-- `JOURNAL.md` — achievements, caveats, next steps
-- `README.md` — any changed public surface
-- `CLAUDE.md` — any structural or workflow changes
-- `.claude/` files — consistency with current code
 
 ---
 
@@ -244,9 +247,9 @@ Switches to `main`, fast-forward pulls, deletes local branch, prunes stale remot
 | `/clean-code` | Before writing — agree on structure |
 | `/code-reviewer` | After writing — architecture + quality gate |
 | `/unit-testing` | After review approves — batch test the diff |
-| `/lint-check` | After tests pass — before committing |
+| `/lint-check` | After tests pass — before documentation |
+| `/documentation` | After lint passes — before committing (docs ship with the feature) |
 | `/ci-debug` | CI fails and not reproducible locally |
-| `/documentation` | After merge — update all docs |
 
 ---
 

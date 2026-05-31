@@ -5,6 +5,63 @@ Entries are dated `YYYY-MM-DD`, newest first.
 
 ---
 
+## 2026-05-31 — Complete Claude JSONL event coverage + agent workflow
+
+### Achievements
+
+- **All Claude JSONL record types now parsed** — 14 new `EventKind` variants added to
+  `aegon-types`, filling the last remaining gaps from the original JSONL audit. Every record
+  type Claude Code emits (`queue-operation`, `pr-link`, `last-prompt`, `file-history-snapshot`,
+  `attachment` with 10 subtypes, and enhanced `system` records) is now parsed into a typed
+  Rust struct and surfaced in the TUI.
+- **`RawAttachment` enum** covers all 10 attachment subtypes Claude Code emits mid-session:
+  plan mode info, skill files, registered tools, PR links, last prompt snapshots, file history
+  snapshots, todo lists, hook output, permissions data, and a catch-all unknown variant.
+- **`SessionState` extended** with five new fields tracking plan mode, PR links, registered
+  tools, background task completions, and retry counts — enabling richer dashboard context.
+- **Retry counting bug fixed** — the dashboard previously showed "N errors" where N was the
+  number of retry legs, not the number of distinct error episodes. Root cause was
+  unconditionally pushing to `errors` on every `SystemError` event. Fixed with an
+  `is_none()` guard on `retry_attempt`.
+- **19 new unit tests** added to `aegon-core/src/session.rs` covering all new `EventKind`
+  variants and the fixed retry counting logic.
+- **TUI and dashboard updated** — all 14 new event types have labeled, colored feed rows; the
+  dashboard header shows `[plan]` badge, PR link, retry count, and background task count.
+- **Agent workflow introduced** — four `.claude/agents/` files created (`ci-debug`,
+  `unit-testing`, `code-reviewer`, `documentation`). Skills stripped to trigger/playbook
+  only; implementation phases delegated to agents. Documentation stage moved to before-commit
+  in the git workflow.
+
+### Caveats
+
+- **`agentId` / `attributionSkill` still not surfaced** — these fields are parsed at the
+  adapter level but not yet propagated to `SessionState` or the TUI. Multi-agent attribution
+  remains invisible in the dashboard.
+- **`registered_tools` is a flat `Vec<String>`** — tool registration events accumulate names
+  but there is no de-duplication or diff tracking across registration events. If the same tool
+  is registered twice it appears twice.
+- **Plan mode badge is binary** — the dashboard shows `[plan]` or nothing; it does not show
+  when plan mode was entered/exited or how many times it toggled.
+- **PR link shows first-seen only** — `pr_links` collects all URLs but the header shows only
+  the first one. Multi-PR sessions will silently drop the extras from the header display.
+- **No persistence yet** — `aegon-db` (SQLite store) remains unbuilt; all the new state
+  fields are in-memory only and do not survive process restarts.
+
+### Next steps
+
+1. **Surface `agentId` / `attributionSkill`** in `SessionState` and the TUI — the audit
+   showed these on every record; multi-agent runs need attribution to be useful.
+2. **Build `aegon-db`** — SQLite store so session state (including new fields) survives
+   restarts; needed before `aegon history` and `aegon replay` can be built.
+3. **`aegon history` / `aegon replay` commands** — the full query-and-replay pipeline planned
+   in CLAUDE.md; blocked on `aegon-db`.
+4. **De-duplicate `registered_tools`** and track diffs per registration event.
+5. **Plan mode timeline** — store `(entered_at, exited_at)` pairs instead of a bool so the
+   TUI can show how long the session spent in plan mode.
+6. **Multi-PR support** — show PR count and make the header PR link clickable / expandable.
+
+---
+
 ## 2026-05-30 — v0.4.0: published to crates.io and PyPI
 
 ### Achievements
