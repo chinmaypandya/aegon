@@ -127,6 +127,17 @@ The watcher automatically picks up `~/.claude/projects/**/*.jsonl` and
 `~/.claude/sessions/**/*.jsonl`. Start a Claude Code session in another
 terminal — events appear in real time.
 
+### Proxy mode (mid-turn token streaming)
+
+```bash
+aegon run --proxy   # starts the JSONL watcher + HTTPS MitM proxy on port 8877
+```
+
+Set `HTTPS_PROXY=http://127.0.0.1:8877` (and optionally `NODE_EXTRA_CA_CERTS` pointing to
+Aegon's local CA cert) before launching Claude Code. The proxy intercepts the Anthropic API
+SSE stream and feeds live `TKN▸` / `THNK▸` token chunks into the event feed as they arrive,
+giving real mid-turn visibility before a turn is written to the JSONL log.
+
 **From source** (contributors):
 
 ```bash

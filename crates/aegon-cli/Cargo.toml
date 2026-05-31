@@ -15,6 +15,7 @@ path = "src/main.rs"
 aegon-types = { workspace = true }
 aegon-adapters = { workspace = true }
 aegon-ui = { workspace = true }
+aegon-proxy = { path = "../aegon-proxy" }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 notify = { workspace = true }

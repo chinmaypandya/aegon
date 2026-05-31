@@ -6,6 +6,7 @@ members = [
     "crates/aegon-cli",
     "crates/aegon-ui",
     "crates/aegon-core",
+    "crates/aegon-proxy",
 ]
 default-members = ["crates/aegon-cli"]
 
@@ -42,6 +43,13 @@ clap = { version = "4", features = ["derive"] }
 
 # Async
 tokio = { version = "1", features = ["full"] }
+
+# Proxy (TLS MitM + SSE tapping)
+tokio-rustls        = "0.26"
+rustls              = { version = "0.23", default-features = false, features = ["ring"] }
+rcgen               = { version = "0.13", features = ["pem"] }
+rustls-native-certs = "0.8"
+bytes               = "1"
 
 # TUI
 ratatui = "0.29"

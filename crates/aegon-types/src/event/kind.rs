@@ -137,6 +137,23 @@ pub enum EventKind {
     /// Tool permission allowlist was updated for this session.
     PermissionsUpdated { allowed_tools: Vec<String> },
 
+    /// A streaming token chunk intercepted mid-turn from the Anthropic API SSE stream.
+    ///
+    /// Emitted by `aegon-proxy` for every `content_block_delta` SSE event. Because
+    /// JSONL is written only at turn completion, these are the only events that show
+    /// what the model is generating while it is still generating.
+    ///
+    /// `request_id` matches the `x-request-id` response header and groups chunks
+    /// into their parent assistant turn.
+    TokenChunk {
+        /// Anthropic request ID — ties this chunk to the completed `AssistantMessage` turn.
+        request_id: String,
+        /// The text delta for this chunk.
+        text: String,
+        /// `true` when this chunk came from a `thinking_delta` block.
+        is_thinking: bool,
+    },
+
     /// An event type not yet handled by this version of Aegon.
     #[serde(other)]
     Unknown,

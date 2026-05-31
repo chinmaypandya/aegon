@@ -5,6 +5,69 @@ Entries are dated `YYYY-MM-DD`, newest first.
 
 ---
 
+## 2026-06-01 — aegon-proxy: mid-turn token streaming via HTTPS MitM
+
+### Achievements
+
+- **`aegon-proxy` crate shipped** — a local HTTPS MitM proxy that sits between Claude Code
+  and `api.anthropic.com`, intercepts every SSE stream, and emits `EventKind::TokenChunk`
+  events into Aegon's event channel in real time. This closes the longest-standing gap in
+  Aegon observability: until now, the JSONL log only captured completed turns, making it
+  impossible to see the model while it was reasoning or generating.
+- **Five focused modules**: `ca.rs` generates a local CA and per-hostname leaf certificates
+  on the fly using `rcgen`; `sse.rs` is a stateful byte-level SSE parser that handles chunked
+  delivery correctly; `anthropic.rs` decodes Anthropic's `content_block_delta` SSE events into
+  `LogEvent`s; `tunnel.rs` implements the CONNECT handler — TLS MitM for `api.anthropic.com`,
+  transparent tunnelling for every other host; `lib.rs` exposes the single `serve(port, tx)`
+  entry point so `aegon-cli` only needs one call.
+- **`EventKind::TokenChunk { request_id, text, is_thinking }`** added to `aegon-types` —
+  lightweight variant that carries one SSE delta payload; `is_thinking` distinguishes model
+  reasoning from response text.
+- **`aegon run --proxy`** starts both the existing JSONL watcher and the new SSE proxy on port
+  8877 in parallel; on startup it prints the `HTTPS_PROXY=http://127.0.0.1:8877` line the
+  user needs to set.
+- **TUI updated** with two new row labels: `TKN▸` (magenta) for text chunks and `THNK▸`
+  (yellow) for thinking chunks — live token delivery is now visible in the event feed as it
+  streams.
+- **13 unit tests** added inside `aegon-proxy` (6 in `sse.rs` covering partial delivery,
+  multi-event frames, and UTF-8 boundaries; 7 in `anthropic.rs` covering delta decoding,
+  `is_thinking` detection, and unknown event passthrough).
+
+### Caveats
+
+- **`HTTPS_PROXY` must be set manually** — Aegon prints the env var on startup but does not
+  inject it into Claude Code's environment automatically. The user must export it in the same
+  shell before launching `claude`. A future improvement would launch Claude Code as a
+  subprocess with the var pre-set.
+- **No system trust store injection yet** — users must trust the local CA manually
+  (`security add-trusted-cert` on macOS, `update-ca-certificates` on Linux) or set
+  `NODE_EXTRA_CA_CERTS` for Node.js processes. Without this step, Claude Code's TLS layer will
+  reject the MitM certificate.
+- **Proxy `session_id` is not linked to the JSONL session UUID** — the proxy assigns an
+  internal `request_id` per SSE connection, but there is currently no mechanism to correlate
+  that with the `sessionId` written by Claude Code into the JSONL file. Token chunks and JSONL
+  events are therefore tracked in separate namespaces.
+- **Claude Code uses Node.js TLS** — Node respects `NODE_EXTRA_CA_CERTS` and `HTTPS_PROXY`
+  but only for outbound `https` module calls, not for all TLS connections. Some internal
+  Claude Code network paths may bypass the proxy entirely.
+
+### Next steps
+
+1. **Auto-inject CA into the system trust store** on first `aegon run --proxy` — detect the
+   platform and run the appropriate trust command, falling back to a printed manual instruction
+   if elevation is needed.
+2. **Correlate proxy `request_id` with JSONL `session_id`** via request timing — match the
+   SSE stream start timestamp against the JSONL turn timestamp to stitch the two namespaces
+   together.
+3. **Add `TokenChunk` to `SessionState`** for a live "tokens/sec" metric — accumulate chunk
+   counts per turn and expose them through `TokenTotals` so the dashboard gauge can show
+   streaming rate.
+4. **Stream partial tool-call arguments** (`input_json_delta`) — the proxy already receives
+   these SSE events but currently drops them; emitting them as a new `EventKind::ToolArgDelta`
+   would give visibility into tool input as it forms.
+
+---
+
 ## 2026-05-31 — Complete Claude JSONL event coverage + agent workflow
 
 ### Achievements
@@ -34,6 +97,13 @@ Entries are dated `YYYY-MM-DD`, newest first.
 
 ### Caveats
 
+- **JSONL is a completed-turn log, not a token stream** — Claude Code writes one JSONL line
+  per full assistant turn, only after the turn finishes. Mid-turn tokens (thinking paragraphs,
+  partial text, tool-call arguments forming incrementally) are never written to JSONL. Aegon
+  therefore cannot observe the model while it is reasoning — only after it commits. The
+  `awaiting_response` spinner in the dashboard exists to paper over this gap. Capturing
+  mid-turn tokens requires intercepting the SSE stream from the Anthropic API before Claude
+  Code buffers it (see Next steps — proxy approach).
 - **`agentId` / `attributionSkill` still not surfaced** — these fields are parsed at the
   adapter level but not yet propagated to `SessionState` or the TUI. Multi-agent attribution
   remains invisible in the dashboard.
@@ -58,6 +128,12 @@ Entries are dated `YYYY-MM-DD`, newest first.
 4. **De-duplicate `registered_tools`** and track diffs per registration event.
 5. **Plan mode timeline** — store `(entered_at, exited_at)` pairs instead of a bool so the
    TUI can show how long the session spent in plan mode.
+6. **Mid-turn token streaming via local proxy** — run a local HTTPS proxy that sits between
+   Claude Code and `api.anthropic.com`, tees the SSE token stream to Aegon's event channel,
+   and emits a new `EventKind::TokenChunk { text, turn_id }` for each streamed chunk. Would
+   give real mid-turn observability: live token-by-token display in the TUI feed, true
+   thinking latency measurement, and partial tool-call argument streaming. Requires a new
+   `aegon-proxy` crate and trust-store injection of a local CA cert.
 6. **Multi-PR support** — show PR count and make the header PR link clickable / expandable.
 
 ---
