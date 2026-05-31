@@ -11,6 +11,21 @@ Versions are dated `YYYY-MM-DD`. Unreleased work sits under `[Unreleased]`.
 
 ### Added
 
+- **`aegon-proxy` crate** — local HTTPS MitM proxy (`crates/aegon-proxy/`) that intercepts
+  Anthropic API SSE streams and emits `EventKind::TokenChunk` events for mid-turn token
+  observability. Modules: `ca.rs` (local CA + per-hostname leaf cert via rcgen), `sse.rs`
+  (stateful SSE parser), `anthropic.rs` (Anthropic SSE decoder), `tunnel.rs` (CONNECT handler
+  for TLS MitM on api.anthropic.com), `lib.rs` (public `serve(port, tx)` entry point). Ships
+  13 unit tests (6 in `sse.rs`, 7 in `anthropic.rs`). New workspace deps: `tokio-rustls`,
+  `rustls`, `rcgen`, `rustls-native-certs`, `bytes`.
+- **`EventKind::TokenChunk { request_id, text, is_thinking }`** — streaming token chunk
+  captured from the Anthropic SSE stream before turn completion; emitted by `aegon-proxy` for
+  every `content_block_delta` event.
+- **`aegon run --proxy` flag** — starts both the JSONL file watcher and the SSE proxy on port
+  8877; prints `HTTPS_PROXY=http://127.0.0.1:8877` setup instructions on launch.
+- **TUI labels `TKN▸` and `THNK▸`** — live token chunk rows in the event feed: text chunks
+  shown in magenta (`TKN▸`), thinking chunks in yellow (`THNK▸`).
+
 - **14 new `EventKind` variants** — complete coverage of the Claude JSONL record space:
   `QueueOperation`, `PrLinked`, `LastPrompt`, `FileSnapshot`, `ToolsRegistered`,
   `SkillsLoaded`, `PlanModeEntered`, `PlanModeExited`, `TodoUpdated`, `HookOutput`,

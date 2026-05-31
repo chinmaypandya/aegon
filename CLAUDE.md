@@ -35,6 +35,7 @@ aegon/
 ├── aegon-db/          Storage engine: SQLite index + disk backup
 ├── aegon-cli/         CLI entry point — file watcher, live mode, query commands
 ├── aegon-ui/          Terminal UI (ratatui) + web UI bridge
+├── aegon-proxy/       Local HTTPS MitM proxy — intercepts Anthropic SSE streams for mid-turn token observability
 ├── aegon-mcp/         Optional MCP server — exposes run data to other tools
 └── aegon-tests/       Integration tests across the full stack
 ```
@@ -79,6 +80,15 @@ aegon/
 - Web UI: serves a local HTTP endpoint that a browser-based frontend can poll or subscribe to
   (the external "LangSmith-style" view)
 - Consumes `aegon-types` only — no direct DB or parser access
+
+**`aegon-proxy`**
+- Local HTTPS MitM proxy that intercepts Anthropic API SSE streams before Claude Code buffers them
+- `ca.rs` — generates a local CA and signs per-hostname leaf certs on the fly (rcgen)
+- `sse.rs` — stateful byte-level SSE parser: raw bytes → `SseEvent`
+- `anthropic.rs` — Anthropic SSE decoder: `SseEvent` → `Option<LogEvent>` (emits `EventKind::TokenChunk`)
+- `tunnel.rs` — CONNECT handler: TLS MitM for `api.anthropic.com`, transparent tunnel for all other hosts
+- `lib.rs` — public `serve(port, tx)` entry point consumed by `aegon-cli --proxy`
+- Emits `EventKind::TokenChunk { request_id, text, is_thinking }` into the shared event channel
 
 **`aegon-mcp`**
 - Optional MCP server that exposes run data and queries as MCP tools
@@ -174,6 +184,13 @@ aegon/
 ├── aegon-db/
 ├── aegon-cli/
 ├── aegon-ui/
+├── aegon-proxy/
+│   └── src/
+│       ├── ca.rs           Local CA + per-hostname leaf cert generation (rcgen)
+│       ├── sse.rs          Stateful SSE parser (raw bytes → SseEvent)
+│       ├── anthropic.rs    Anthropic SSE decoder (SseEvent → Option<LogEvent>)
+│       ├── tunnel.rs       CONNECT handler: TLS MitM for api.anthropic.com
+│       └── lib.rs          Public serve(port, tx) entry point
 ├── aegon-mcp/
 ├── aegon-tests/
 │   └── fixtures/

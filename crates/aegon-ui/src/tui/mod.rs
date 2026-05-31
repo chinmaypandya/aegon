@@ -326,6 +326,15 @@ fn format_event(e: &LogEvent, max_detail: usize) -> Line<'static> {
             Color::DarkGray,
             format!("{} tool(s) allowed", allowed_tools.len()),
         ),
+        EventKind::TokenChunk {
+            text, is_thinking, ..
+        } => {
+            if *is_thinking {
+                ("THNK▸", Color::Yellow, truncate(text, max_detail))
+            } else {
+                ("TKN▸ ", Color::Magenta, truncate(text, max_detail))
+            }
+        }
 
         EventKind::Unknown => ("???? ", Color::DarkGray, String::new()),
     };

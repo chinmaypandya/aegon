@@ -1,0 +1,22 @@
+[package]
+name = "aegon-proxy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Local HTTPS MitM proxy that taps Anthropic API SSE streams for mid-turn token observability."
+
+[dependencies]
+aegon-types         = { workspace = true }
+tokio               = { workspace = true }
+tokio-rustls        = { workspace = true }
+rustls              = { workspace = true }
+rcgen               = { workspace = true }
+rustls-native-certs = { workspace = true }
+bytes               = { workspace = true }
+serde               = { workspace = true }
+serde_json          = { workspace = true }
+thiserror           = { workspace = true }
+chrono              = { workspace = true }
+uuid                = { workspace = true }

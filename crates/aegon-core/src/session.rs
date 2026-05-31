@@ -203,6 +203,7 @@ impl SessionState {
             | EventKind::FileEdited { .. }
             | EventKind::DateChange { .. }
             | EventKind::PermissionsUpdated { .. }
+            | EventKind::TokenChunk { .. }
             | EventKind::Unknown => {}
         }
     }
