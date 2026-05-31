@@ -9,6 +9,51 @@ Versions are dated `YYYY-MM-DD`. Unreleased work sits under `[Unreleased]`.
 
 ## [Unreleased]
 
+### Added
+
+- **14 new `EventKind` variants** — complete coverage of the Claude JSONL record space:
+  `QueueOperation`, `PrLinked`, `LastPrompt`, `FileSnapshot`, `ToolsRegistered`,
+  `SkillsLoaded`, `PlanModeEntered`, `PlanModeExited`, `TodoUpdated`, `HookOutput`,
+  `FileEdited`, `DateChange`, `BackgroundTaskResult`, `PermissionsUpdated`
+- **`SystemError` retry fields** — `retry_attempt: Option<u32>`, `max_retries: Option<u32>`,
+  `retry_in_ms: Option<u64>` added to the `SystemError` variant so transient connection
+  errors can be surfaced with full retry context
+- **`RawAttachment` enum** (10 subtypes) in `aegon-adapters` — parses every attachment
+  category Claude Code can emit: `PlanModeInfo`, `SkillFile`, `RegisteredTools`,
+  `PrLink`, `LastPrompt`, `FileHistorySnapshot`, `TodoList`, `HookOutputData`,
+  `PermissionsData`, and `Unknown`
+- **New `SessionState` fields** in `aegon-core`:
+  - `in_plan_mode: bool` — tracks whether the session is in plan mode
+  - `pr_links: Vec<String>` — collects all PR URLs seen during the session
+  - `registered_tools: Vec<String>` — list of tool names registered mid-session
+  - `background_tasks_completed: u32` — count of completed background task results
+  - `retry_count: u32` — cumulative retry attempts (distinct from error episodes)
+- **TUI event feed labels** — all 14 new `EventKind` variants have labeled, colored rows in
+  the live feed: `QUEUE`, `PR`, `PROMPT`, `SNAP`, `TOOLS`, `SKILL`, `PLAN+`, `PLAN-`,
+  `TODO`, `HOOK`, `EDIT`, `DATE`, `BG`, `PERM`; retry info shows inline on `ERR` rows
+- **Dashboard header badges** — header now shows `[plan]` badge when plan mode is active,
+  linked PR URL when available, retry count, and completed background task count
+- **`extract_xml_tag` helper** in `aegon-adapters/src/claude/mod.rs` — extracts a named XML
+  tag from a string; used to pull structured fields out of Claude's XML-wrapped attachment
+  content
+- **4 new `.claude/agents/`** — sub-agent implementations for automated workflows:
+  `ci-debug.md`, `unit-testing.md`, `code-reviewer.md`, `documentation.md`
+
+### Fixed
+
+- **Retry legs no longer inflate `errors.len()`** — `SessionState::ingest` previously pushed
+  one entry to the `errors` vec per retry leg; a single connection error retried 10 times
+  showed "10 errors, 10 retries" on the dashboard instead of "1 error, 10 retries". Fixed by
+  only pushing to `errors` when `retry_attempt.is_none()` (i.e. the root error episode).
+
+### Changed
+
+- **Git workflow** — documentation stage moved from after-merge to before-commit (stage 6).
+  Documentation now ships with the feature instead of being a post-merge cleanup step.
+- **`.claude/skills/` trimmed to trigger/playbook content** — `ci-debug` and `unit-testing`
+  skill files stripped to workflow orchestration; the full implementation phases moved to the
+  corresponding `.claude/agents/` files.
+
 ---
 
 ## [0.4.0] — 2026-05-30

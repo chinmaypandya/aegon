@@ -162,6 +162,7 @@ fn draw_dashboard_panel(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app
 fn format_event(e: &LogEvent, max_detail: usize) -> Line<'static> {
     let ts = e.timestamp.format("%H:%M:%S").to_string();
     let (label, color, detail) = match &e.kind {
+        // ── core conversation ────────────────────────────────────────────────
         EventKind::ToolCall(tc) => (
             "TOOL▶",
             Color::Green,
@@ -183,6 +184,149 @@ fn format_event(e: &LogEvent, max_detail: usize) -> Line<'static> {
             ),
         ),
         EventKind::Thinking { text, .. } => ("THINK", Color::Yellow, truncate(text, max_detail)),
+        EventKind::SessionTitle { title } => ("TITLE", Color::Cyan, truncate(title, max_detail)),
+        EventKind::SessionMode { mode } => ("MODE ", Color::DarkGray, mode.clone()),
+        EventKind::SystemError {
+            message,
+            code,
+            retry_attempt,
+            max_retries,
+            ..
+        } => {
+            let base = match code {
+                Some(c) => format!("[{c}] {}", truncate(message, max_detail.saturating_sub(10))),
+                None => truncate(message, max_detail),
+            };
+            let retry_suffix = match (retry_attempt, max_retries) {
+                (Some(attempt), Some(max)) => format!(" (retry {attempt}/{max})"),
+                (Some(attempt), None) => format!(" (retry #{attempt})"),
+                _ => String::new(),
+            };
+            ("ERR  ", Color::Red, format!("{base}{retry_suffix}"))
+        }
+
+        // ── session bookkeeping ──────────────────────────────────────────────
+        EventKind::QueueOperation { operation } => ("QUEUE", Color::DarkGray, operation.clone()),
+        EventKind::PrLinked {
+            pr_number,
+            pr_url,
+            repository,
+        } => (
+            "PR   ",
+            Color::Cyan,
+            format!(
+                "#{pr_number} {repository} {}",
+                truncate(pr_url, max_detail.saturating_sub(20))
+            ),
+        ),
+        EventKind::LastPrompt { content } => {
+            ("LAST ", Color::DarkGray, truncate(content, max_detail))
+        }
+        EventKind::FileSnapshot { is_update } => (
+            "SNAP ",
+            Color::DarkGray,
+            if *is_update {
+                "update".into()
+            } else {
+                "initial".into()
+            },
+        ),
+
+        // ── harness attachment events ────────────────────────────────────────
+        EventKind::ToolsRegistered { added, removed } => {
+            let detail = if removed.is_empty() {
+                format!("+{} tool(s): {}", added.len(), added.join(", "))
+            } else {
+                format!(
+                    "+{} -{} tool(s): {}",
+                    added.len(),
+                    removed.len(),
+                    added.join(", ")
+                )
+            };
+            ("TOOLS", Color::Yellow, truncate(&detail, max_detail))
+        }
+        EventKind::SkillsLoaded { content } => {
+            // Count skills by counting "- " prefixes.
+            let count = content.lines().filter(|l| l.starts_with("- ")).count();
+            (
+                "SKILL",
+                Color::Yellow,
+                format!("{count} skill(s) available"),
+            )
+        }
+        EventKind::PlanModeEntered { plan_file, .. } => {
+            let file = plan_file
+                .as_deref()
+                .and_then(|p| p.rsplit('/').next())
+                .unwrap_or("plan");
+            (
+                "PLAN▶",
+                Color::Magenta,
+                format!("entered plan mode ({file})"),
+            )
+        }
+        EventKind::PlanModeExited { plan_file } => {
+            let file = plan_file
+                .as_deref()
+                .and_then(|p| p.rsplit('/').next())
+                .unwrap_or("plan");
+            (
+                "PLAN■",
+                Color::DarkGray,
+                format!("exited plan mode ({file})"),
+            )
+        }
+        EventKind::TodoUpdated { item_count } => {
+            ("TODO ", Color::DarkGray, format!("{item_count} item(s)"))
+        }
+        EventKind::HookOutput {
+            hook_name, content, ..
+        } => {
+            let first = content.first().map(String::as_str).unwrap_or("");
+            (
+                "HOOK ",
+                Color::Blue,
+                format!(
+                    "{hook_name}: {}",
+                    truncate(first, max_detail.saturating_sub(20))
+                ),
+            )
+        }
+        EventKind::FileEdited { path, .. } => {
+            let filename = path.rsplit('/').next().unwrap_or(path.as_str());
+            ("EDIT ", Color::Green, filename.to_owned())
+        }
+        EventKind::DateChange { new_date } => ("DATE ", Color::DarkGray, format!("→ {new_date}")),
+        EventKind::BackgroundTaskResult {
+            task_id,
+            status,
+            summary,
+        } => {
+            let id_prefix = task_id
+                .as_deref()
+                .map(|id| format!("[{id}] "))
+                .unwrap_or_default();
+            let color = if status == "completed" {
+                Color::Green
+            } else {
+                Color::Red
+            };
+            (
+                "BGTSK",
+                color,
+                format!(
+                    "{id_prefix}{status}: {}",
+                    truncate(summary, max_detail.saturating_sub(30))
+                ),
+            )
+        }
+        EventKind::PermissionsUpdated { allowed_tools } => (
+            "PERMS",
+            Color::DarkGray,
+            format!("{} tool(s) allowed", allowed_tools.len()),
+        ),
+
         EventKind::Unknown => ("???? ", Color::DarkGray, String::new()),
     };
 

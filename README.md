@@ -20,16 +20,17 @@ https://github.com/user-attachments/assets/a34fd65b-3872-40b2-a0a4-ef012dcf0c0a
 ┌─ Aegon   1 session   247 events ──────────────────────────────────────────────────────────┐
 │                                                                                             │
 │  Events (newest first)          │  Session                                                 │
-│  ─────────────────────          │  Live session  ● LIVE   247 events                      │
-│  14:22:01 TOOL▶ Bash cargo…     │  ─────────────────────────────────────────────────────  │
+│  ─────────────────────          │  Live session  ● LIVE  [plan]  PR#42  247 events        │
+│  14:22:01 TOOL▶ Bash cargo…     │  2 retries  3 bg tasks                                  │
+│  14:22:01 PLAN+ entering plan…  │  ─────────────────────────────────────────────────────  │
 │  14:22:00 THINK I should…       │  Tokens  ████████████░░░░░░░░░░  42k / 200k             │
 │  14:21:59 ASST  Let me run…     │  in=38420  out=3801  cache_r=71204                      │
-│  14:21:55 TOOL◀ Finished `d…    │  est. cost: $0.0321                                     │
-│  14:21:54 TOOL▶ Read src/…      │  ─────────────────────────────────────────────────────  │
-│  14:21:54 TOOL▶ Bash ls -la…    │  Steps                                                  │
-│  14:21:53 ASST  I'll check…     │  ⠋ Bash          [1.2s]                                 │
-│  14:21:52 USER  lets start…     │  ✓ Read          312ms                                  │
-│                                 │  ✓ Write         89ms                                   │
+│  14:21:58 ERR   connect (r=2/3) │  est. cost: $0.0321                                     │
+│  14:21:55 TOOL◀ Finished `d…    │  ─────────────────────────────────────────────────────  │
+│  14:21:54 TOOL▶ Read src/…      │  Steps                                                  │
+│  14:21:54 TOOL▶ Bash ls -la…    │  ⠋ Bash          [1.2s]                                 │
+│  14:21:53 ASST  I'll check…     │  ✓ Read          312ms                                  │
+│  14:21:52 USER  lets start…     │  ✓ Write         89ms                                   │
 │                                 │  ─────────────────────────────────────────────────────  │
 │                                 │  Flow                                                    │
 │                                 │  USER → THINK → [Bash ‖ Read] → ASST → Write → ASST    │
@@ -37,11 +38,13 @@ https://github.com/user-attachments/assets/a34fd65b-3872-40b2-a0a4-ef012dcf0c0a
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Left panel — **raw event feed**: every tool call, result, thinking block, and assistant message
-in arrival order, coloured by type, newest first.
+Left panel — **raw event feed**: every tool call, result, thinking block, assistant message,
+plan mode transition, hook output, todo update, and more — in arrival order, coloured by type,
+newest first. All 20+ event kinds are labeled and coloured.
 
 Right panel — **live dashboard**:
-- **Session header**: title, live/idle status, event count
+- **Session header**: title, live/idle status, `[plan]` badge when in plan mode, linked PR,
+  retry count, background task count, total event count
 - **Token gauge**: progress bar auto-filling as the context window fills; estimated cost
 - **Steps**: spinner on active tool calls, ✓/✗ for completed/failed, with timing
 - **Flow**: one-line causal chain showing order, parallel branches (`[Bash ‖ Read]`), and
@@ -86,7 +89,7 @@ Right panel — **live dashboard**:
 
 | Crate | Role |
 |-------|------|
-| `aegon-types` | All domain types — `LogEvent`, `EventKind`, `ToolCall`, `ToolResult`, `TokenUsage`, `Session`, `StreamId` |
+| `aegon-types` | All domain types — `LogEvent`, `EventKind` (20+ variants), `ToolCall`, `ToolResult`, `TokenUsage`, `Session`, `StreamId` |
 | `aegon-adapters` | Claude JSONL → `Vec<LogEvent>`; lenient on unknown fields |
 | `aegon-core` | Pure session logic — `SessionState`, `SessionRegistry`, `Step`, `FlowNode`, `TokenTotals` |
 | `aegon-ui` | ratatui TUI — split event feed + dashboard |

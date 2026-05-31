@@ -134,6 +134,14 @@ From the raw JSONL, Aegon captures:
 | Context window state | Summarised in session metadata |
 | Run boundaries (start, end, abort) | Session lifecycle events |
 | Step causality (what triggered what) | Event ordering + parent IDs |
+| Plan mode transitions | `attachment` / `PlanModeInfo` records |
+| PR links | `attachment` / `PrLink` records |
+| Registered tools | `attachment` / `RegisteredTools` records |
+| Todo list state | `attachment` / `TodoList` records |
+| Hook output | `attachment` / `HookOutputData` records |
+| Transient errors + retry counts | `system` records with `retry_attempt` field |
+| Background task completions | `BackgroundTaskResult` events |
+| File snapshot / edit history | `FileHistorySnapshot` / `FileEdited` events |
 
 ---
 
@@ -142,11 +150,16 @@ From the raw JSONL, Aegon captures:
 ```
 aegon/
 ├── .claude/
+│   ├── agents/
+│   │   ├── ci-debug.md         Sub-agent: full CI failure reproduction logic
+│   │   ├── unit-testing.md     Sub-agent: diff-aware batch test writing and fix loop
+│   │   ├── code-reviewer.md    Sub-agent: correctness + simplification review
+│   │   └── documentation.md    Sub-agent: CHANGELOG, JOURNAL, README, CLAUDE.md updates
 │   └── skills/
 │       ├── clean-code/     Rust SOLID principles + feature-driven design + docs rules
-│       ├── unit-testing/   Diff-aware batch test writing and fix loop
+│       ├── unit-testing/   Trigger/playbook — delegates implementation to agents/unit-testing.md
 │       ├── lint-check/     fmt + clippy + check — mirrors CI
-│       ├── ci-debug/       Reproduces CI failures locally via Docker/subprocess
+│       ├── ci-debug/       Trigger/playbook — delegates implementation to agents/ci-debug.md
 │       └── git-worflows/   Orchestrator: branch → code → test → lint → commit → PR → merge
 ├── .github/
 │   └── workflows/
@@ -184,14 +197,13 @@ just branch feat/<name>
     → write features
     → /unit-testing   (batch test the diff)
     → /lint-check     (just ci-lint)
+    → /documentation  (update CHANGELOG.md, JOURNAL.md, README.md, CLAUDE.md)
     → just commit "feat(<crate>): ..."
     → just push
     → just pr
     → CI runs automatically
     → just merge
     → just cleanup <branch>
-    → write to a changelog file about features merged. (CHANGELOG.md)
-    → write to a JOURNAL.md file about features released, caveats, next steps and focus points.
 ```
 
 If CI fails: `/ci-debug` — or run `just ci` locally to reproduce exactly.
@@ -203,9 +215,10 @@ If CI fails: `/ci-debug` — or run `just ci` locally to reproduce exactly.
 | Skill | When to use |
 |-------|------------|
 | `/clean-code` | Before writing: design types, modules, traits |
-| `/unit-testing` | After writing a batch: diff-aware test loop |
+| `/unit-testing` | After writing a batch: diff-aware test loop (delegates to `agents/unit-testing.md`) |
 | `/lint-check` | After tests pass: fmt + clippy + check |
-| `/ci-debug` | CI fails and you can't reproduce locally |
+| `/ci-debug` | CI fails and you can't reproduce locally (delegates to `agents/ci-debug.md`) |
+| `/documentation` | Before committing: update CHANGELOG, JOURNAL, README, CLAUDE.md (delegates to `agents/documentation.md`) |
 | `/git-workflows` | All branching, commit, PR, merge operations |
 
 ---
