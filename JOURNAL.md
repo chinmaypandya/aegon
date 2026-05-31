@@ -50,6 +50,18 @@ Entries are dated `YYYY-MM-DD`, newest first.
 - **Claude Code uses Node.js TLS** — Node respects `NODE_EXTRA_CA_CERTS` and `HTTPS_PROXY`
   but only for outbound `https` module calls, not for all TLS connections. Some internal
   Claude Code network paths may bypass the proxy entirely.
+- **Single-read request buffer** (`tunnel.rs`) — the outbound HTTP request from Claude Code is
+  read in one `read()` call into a fixed 64 KiB buffer. Requests larger than 64 KiB (e.g. very
+  large system prompts) are silently truncated before being forwarded to Anthropic. A
+  content-length-guided or `read_to_end` loop is needed to handle these safely.
+- **Response header safety valve is silent** (`tunnel.rs`) — if response headers exceed 64 KiB
+  the byte-by-byte header loop breaks without returning an error, which causes the response body
+  to be miscategorised as non-SSE and forwarded verbatim. Should return an error instead of
+  continuing silently.
+- **`message_delta` usage events discarded** — Anthropic's `message_delta` SSE event carries the
+  turn's final `input_tokens`, `output_tokens`, and cache token counts. The proxy currently drops
+  this event type. Capturing it would allow `TokenUsage` events to be emitted from the proxy
+  channel without waiting for the JSONL file to be written.
 
 ### Next steps
 
