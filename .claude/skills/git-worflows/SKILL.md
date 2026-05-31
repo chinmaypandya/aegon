@@ -2,15 +2,16 @@
 name: code-workflow
 description: >
   Git + just workflow orchestrator. Covers branching, commit conventions, when to call
-  sub-skills (clean-code, unit-testing, lint-check, ci-debug), push, PR strategies, and
-  merge patterns. Use when starting work, committing, opening a PR, merging, or cleaning up.
+  sub-skills and agents (clean-code, code-reviewer, unit-testing, lint-check, ci-debug,
+  documentation), push, PR strategies, and merge patterns. Use when starting work,
+  committing, opening a PR, merging, or cleaning up.
 ---
 
 # Git Workflow — Orchestrator
 
 This skill owns the **shape of development**: how to start, structure, validate, and ship work.
-It does not run tests, lint, or write code itself — it delegates to the right sub-skill at the
-right moment.
+It does not run tests, lint, or write code itself — it delegates to the right agent or sub-skill
+at the right moment.
 
 ---
 
@@ -27,9 +28,44 @@ right moment.
 ## The Full Development Loop
 
 ```
-branch → /clean-code → write features → /unit-testing → /lint-check → commit → push → PR → CI → merge
-                                                                                              ↓ (CI fails)
-                                                                                         /ci-debug
+branch
+  │
+  ▼
+/clean-code  (design types, modules, traits before writing)
+  │
+  ▼
+write features
+  │
+  ▼
+/code-reviewer  ◄─────────────────────────────────────┐
+  │                                                    │
+  ├─ REQUEST CHANGES ──────────────────────────────────┘
+  │
+  ▼ APPROVE
+/unit-testing
+  │
+  ├─ Bug in prod code ──► fix ──► /code-reviewer ──► /unit-testing
+  │
+  ▼ Tests green
+/lint-check
+  │
+  ▼
+commit → push → PR
+  │
+  ▼
+CI
+  │
+  ├─ Lint/test fail (local) ──► /lint-check or /unit-testing
+  ├─ Fail not reproducible  ──► /ci-debug
+  │
+  ▼ CI green
+merge
+  │
+  ▼
+/documentation
+  │
+  ▼
+cleanup
 ```
 
 ---
@@ -40,7 +76,7 @@ branch → /clean-code → write features → /unit-testing → /lint-check → 
 just branch <type>/<slug>
 ```
 
-Syncs `main` with `--ff-only` (fails loudly on unexpected local commits), then creates the branch.
+Syncs `main` with `--ff-only`, then creates the branch.
 
 **Branch naming:**
 
@@ -54,42 +90,52 @@ Syncs `main` with `--ff-only` (fails loudly on unexpected local commits), then c
 | `test/` | Tests only |
 | `release/` | Release prep |
 
-**Before writing any code:** invoke `/clean-code` to agree on module structure and type design
-for the feature. This avoids structural rework after tests are written.
+**Before writing any code:** invoke `/clean-code` to agree on module structure and type design.
+This avoids structural rework after review and tests are written.
 
 ---
 
 ## Stage 2 — Write Features
 
-Follow `/clean-code` principles. Write the batch of features for this branch before moving on.
-Do not interleave writing + testing + committing — complete the feature batch first.
+Follow `/clean-code` principles. Write the full batch of features before moving on.
+Do not interleave writing + reviewing + testing + committing.
 
 ---
 
-## Stage 3 — Test the Batch
+## Stage 3 — Code Review
 
-Once features are written, invoke `/unit-testing`. It diffs against `main`, writes tests for
-all changed public items in one pass, runs only the affected crates, and iterates until green.
+Invoke `/code-reviewer`. It audits architecture, DRY, trait design, crate layer violations,
+and documentation completeness.
+
+- **APPROVE** → proceed to unit-testing.
+- **REQUEST CHANGES** → fix findings, re-invoke `/code-reviewer`.
+
+Do not proceed to testing until the reviewer approves.
+
+---
+
+## Stage 4 — Test the Batch
+
+Invoke `/unit-testing`. It diffs against `main`, writes tests in one pass, runs only affected
+crates, and iterates until green.
 
 Do not commit before tests pass.
 
 ---
 
-## Stage 4 — Lint
+## Stage 5 — Lint
 
-After tests are green, invoke `/lint-check`:
+Invoke `/lint-check`:
 
 ```bash
-just fmt && just clippy && just check
+just ci-lint    # fmt-check + clippy + check — mirrors CI exactly
 ```
 
 Fix all warnings. Do not commit with clippy warnings.
 
 ---
 
-## Stage 5 — Commit
-
-Commit atomically — one logical change per commit:
+## Stage 6 — Commit
 
 ```bash
 just commit "<type>(<scope>): <description>"
@@ -106,63 +152,57 @@ just commit "<type>(<scope>): <description>"
 ```
 
 - `type` must match the branch type.
-- `scope` is the crate or module affected (optional but recommended).
+- `scope` is the crate or module affected.
 - Breaking changes: `feat(api)!: rename endpoint`
-
-Multiple commits per branch are fine — one per logical unit of work.
 
 ---
 
-## Stage 6 — Push
+## Stage 7 — Push and PR
 
 ```bash
 just push        # first push — sets upstream
-just sync        # subsequent pushes — rebases on main + force-pushes with lease
-```
-
-Use `just sync` to stay current with `main` throughout the branch lifetime, not just at PR time.
-
----
-
-## Stage 7 — Open a PR
-
-```bash
-just pr          # interactive: gh prompts for title + body
+just sync        # subsequent — rebases on main + force-pushes with lease
+just pr          # open PR (gh prompts for title + body)
 just pr-draft    # same, marks as draft
 ```
 
-PR description must include:
-- What changed and why (not just what — that's in the diff).
-- Any breaking changes.
-- Test plan (what `/unit-testing` covered + what CI will run).
+PR description must include: what changed and why, breaking changes, test plan.
 
 ---
 
 ## Stage 8 — CI
 
-CI runs `cargo fmt --check`, `cargo clippy`, and `cargo test` on push/PR. You do not need to
-run the full suite locally — that is CI's job.
+CI runs `cargo fmt --check`, `cargo clippy`, `cargo test` on push/PR.
 
 If CI fails:
-- Lint/clippy failure → re-run `/lint-check` locally, fix, push.
-- Test failure → re-run `/unit-testing` on the failing crate, fix, push.
-- Failure not reproducible locally → invoke `/ci-debug` to replicate the CI environment.
+- Lint/clippy → re-run `/lint-check`, fix, push.
+- Test → re-run `/unit-testing` on failing crate, fix, push.
+- Not reproducible locally → invoke `/ci-debug`.
 
 ---
 
 ## Stage 9 — Merge
 
-Squash merge (preferred for feature branches — keeps `main` history clean):
-
 ```bash
 just merge       # squash-merges current PR + deletes remote branch
 ```
 
-For `release/` branches: merge commit is acceptable to preserve history.
+For `release/` branches: merge commit is acceptable.
 
 ---
 
-## Stage 10 — Cleanup
+## Stage 10 — Documentation
+
+After merge, invoke `/documentation`. It audits the diff and updates:
+- `CHANGELOG.md` — user-facing changes under `[Unreleased]`
+- `JOURNAL.md` — achievements, caveats, next steps
+- `README.md` — any changed public surface
+- `CLAUDE.md` — any structural or workflow changes
+- `.claude/` files — consistency with current code
+
+---
+
+## Stage 11 — Cleanup
 
 ```bash
 just cleanup <branch-name>
@@ -192,18 +232,21 @@ Switches to `main`, fast-forward pulls, deletes local branch, prunes stale remot
 | `just test` | `cargo test --workspace` |
 | `just fmt` | `cargo fmt --all` |
 | `just clippy` | `cargo clippy --workspace -D warnings` |
+| `just ci-lint` | fmt-check + clippy + check (mirrors CI) |
 | `just fix` | `cargo fix` |
 
 ---
 
-## Sub-Skills Reference
+## Agent and Skill Reference
 
-| Skill | When to call |
-|-------|-------------|
-| `/clean-code` | Before writing features — agree on structure |
-| `/unit-testing` | After features are written — batch test the diff |
+| Agent / Skill | When to call |
+|---------------|-------------|
+| `/clean-code` | Before writing — agree on structure |
+| `/code-reviewer` | After writing — architecture + quality gate |
+| `/unit-testing` | After review approves — batch test the diff |
 | `/lint-check` | After tests pass — before committing |
-| `/ci-debug` | When CI fails and it's not reproducible locally |
+| `/ci-debug` | CI fails and not reproducible locally |
+| `/documentation` | After merge — update all docs |
 
 ---
 
@@ -211,5 +254,5 @@ Switches to `main`, fast-forward pulls, deletes local branch, prunes stale remot
 
 - **`just branch` fails:** local `main` has commits not on remote — investigate before proceeding.
 - **`just sync` refuses:** remote has commits you haven't fetched — `git fetch` first.
-- **Amending:** `git commit --amend --no-edit` then `just sync` to force-push safely.
-- **Mid-work stash:** `git stash push -m "wip: ..."` and `git stash pop` — fine to run directly.
+- **Amending:** `git commit --amend --no-edit` then `just sync`.
+- **Mid-work stash:** `git stash push -m "wip: ..."` then `git stash pop`.

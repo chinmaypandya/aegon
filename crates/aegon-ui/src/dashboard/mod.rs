@@ -51,16 +51,57 @@ fn draw_header(f: &mut Frame, area: Rect, state: &SessionState) {
         Color::DarkGray
     };
 
+    let mode_badge = match state.mode.as_deref() {
+        Some("auto") => "  [auto]",
+        _ => "",
+    };
+
+    let plan_badge = if state.in_plan_mode { "  [plan]" } else { "" };
+
+    let error_badge = if state.errors.is_empty() {
+        String::new()
+    } else {
+        let retry_suffix = if state.retry_count > 0 {
+            format!(
+                ", {} retr{}",
+                state.retry_count,
+                if state.retry_count == 1 { "y" } else { "ies" }
+            )
+        } else {
+            String::new()
+        };
+        format!("  ⚠ {} error(s){}", state.errors.len(), retry_suffix)
+    };
+
+    let pr_badge = if state.pr_links.is_empty() {
+        String::new()
+    } else {
+        // Show the most recent PR number.
+        let (num, _) = &state.pr_links[state.pr_links.len() - 1];
+        format!("  PR #{num}")
+    };
+
+    let bgtask_badge = if state.background_tasks_completed > 0 {
+        format!("  {} bg task(s)", state.background_tasks_completed)
+    } else {
+        String::new()
+    };
+
     let text = ratatui::text::Line::from(vec![
         ratatui::text::Span::styled(
             format!(" {title}"),
             Style::default().add_modifier(Modifier::BOLD),
         ),
+        ratatui::text::Span::styled(mode_badge, Style::default().fg(Color::Cyan)),
+        ratatui::text::Span::styled(plan_badge, Style::default().fg(Color::Magenta)),
         ratatui::text::Span::styled(format!("  {status}"), Style::default().fg(status_color)),
         ratatui::text::Span::styled(
             format!("   {} events", state.event_count),
             Style::default().fg(Color::DarkGray),
         ),
+        ratatui::text::Span::styled(error_badge, Style::default().fg(Color::Red)),
+        ratatui::text::Span::styled(pr_badge, Style::default().fg(Color::Cyan)),
+        ratatui::text::Span::styled(bgtask_badge, Style::default().fg(Color::DarkGray)),
     ]);
 
     let widget = Paragraph::new(text).block(

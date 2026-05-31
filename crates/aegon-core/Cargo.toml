@@ -11,3 +11,6 @@ description = "Session state and DAG logic for Aegon — pure computation, no I/
 aegon-types = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -11,7 +11,7 @@ use aegon_types::{
     EventKind, LogEvent, Result, StreamId, TokenUsage, ToolCall, ToolMetadata, ToolResult,
 };
 use chrono::DateTime;
-use raw::{RawContent, RawRecord, RawToolUseResult};
+use raw::{RawAttachment, RawContent, RawRecord, RawToolUseResult};
 use uuid::Uuid;
 
 /// Adapter for Claude Code session JSONL files.
@@ -63,6 +63,7 @@ impl Adapter for ClaudeAdapter {
                     for content in msg.content.unwrap_or_default() {
                         match content {
                             RawContent::Text { text } => text_parts.push(text),
+                            RawContent::Image => text_parts.push("[image]".into()),
                             RawContent::ToolUse { id, name, input } => {
                                 events.push(make_event(
                                     Uuid::new_v4(),
@@ -149,11 +150,217 @@ impl Adapter for ClaudeAdapter {
                 }
             }
 
-            // queue-operation, summary, attachment, and future types — no observable signal
+            Some("ai-title") => {
+                if let Some(title) = record.ai_title {
+                    events.push(make_event(
+                        event_id,
+                        session_id,
+                        parent_id,
+                        timestamp,
+                        stream,
+                        EventKind::SessionTitle { title },
+                    ));
+                }
+            }
+
+            Some("mode") => {
+                if let Some(mode) = record.mode {
+                    events.push(make_event(
+                        event_id,
+                        session_id,
+                        parent_id,
+                        timestamp,
+                        stream,
+                        EventKind::SessionMode { mode },
+                    ));
+                }
+            }
+
+            Some("system") => {
+                if let Some(err) = record.error {
+                    let message = err
+                        .formatted
+                        .or(err.message)
+                        .unwrap_or_else(|| "Unknown system error".into());
+                    let code = err.connection.and_then(|c| c.code);
+                    events.push(make_event(
+                        event_id,
+                        session_id,
+                        parent_id,
+                        timestamp,
+                        stream,
+                        EventKind::SystemError {
+                            message,
+                            code,
+                            retry_attempt: record.retry_attempt,
+                            max_retries: record.max_retries,
+                            retry_in_ms: record.retry_in_ms,
+                        },
+                    ));
+                }
+            }
+
+            Some("queue-operation") => {
+                if let Some(operation) = record.operation {
+                    events.push(make_event(
+                        event_id,
+                        session_id,
+                        parent_id,
+                        timestamp,
+                        stream,
+                        EventKind::QueueOperation { operation },
+                    ));
+                }
+            }
+
+            Some("pr-link") => {
+                if let (Some(pr_number), Some(pr_url)) = (record.pr_number, record.pr_url) {
+                    let repository = record
+                        .pr_repository
+                        .unwrap_or_else(|| "unknown/repo".into());
+                    events.push(make_event(
+                        event_id,
+                        session_id,
+                        parent_id,
+                        timestamp,
+                        stream,
+                        EventKind::PrLinked {
+                            pr_number,
+                            pr_url,
+                            repository,
+                        },
+                    ));
+                }
+            }
+
+            Some("last-prompt") => {
+                if let Some(content) = record.last_prompt {
+                    events.push(make_event(
+                        event_id,
+                        session_id,
+                        parent_id,
+                        timestamp,
+                        stream,
+                        EventKind::LastPrompt { content },
+                    ));
+                }
+            }
+
+            Some("file-history-snapshot") => {
+                events.push(make_event(
+                    event_id,
+                    session_id,
+                    parent_id,
+                    timestamp,
+                    stream,
+                    EventKind::FileSnapshot {
+                        is_update: record.is_snapshot_update,
+                    },
+                ));
+            }
+
+            Some("attachment") => {
+                if let Some(attachment) = record.attachment {
+                    let kind = attachment_to_kind(attachment);
+                    if let Some(kind) = kind {
+                        events.push(make_event(
+                            event_id, session_id, parent_id, timestamp, stream, kind,
+                        ));
+                    }
+                }
+            }
+
             _ => {}
         }
 
         Ok(events)
+    }
+}
+
+/// Convert a parsed `RawAttachment` into an `EventKind`, or `None` for noise-only attachments.
+fn attachment_to_kind(attachment: RawAttachment) -> Option<EventKind> {
+    match attachment {
+        RawAttachment::DeferredToolsDelta {
+            added_names,
+            removed_names,
+        } => Some(EventKind::ToolsRegistered {
+            added: added_names,
+            removed: removed_names,
+        }),
+
+        RawAttachment::SkillListing { content } => Some(EventKind::SkillsLoaded { content }),
+
+        RawAttachment::PlanMode {
+            plan_file_path,
+            plan_exists,
+        } => Some(EventKind::PlanModeEntered {
+            plan_file: plan_file_path,
+            plan_exists,
+        }),
+
+        RawAttachment::PlanModeExit { plan_file_path } => Some(EventKind::PlanModeExited {
+            plan_file: plan_file_path,
+        }),
+
+        RawAttachment::TodoReminder { item_count } => Some(EventKind::TodoUpdated { item_count }),
+
+        RawAttachment::HookAdditionalContext {
+            content,
+            hook_name,
+            tool_use_id,
+        } => Some(EventKind::HookOutput {
+            hook_name,
+            tool_use_id,
+            content,
+        }),
+
+        RawAttachment::EditedTextFile { filename, snippet } => Some(EventKind::FileEdited {
+            path: filename,
+            snippet,
+        }),
+
+        RawAttachment::DateChange { new_date } => Some(EventKind::DateChange { new_date }),
+
+        RawAttachment::QueuedCommand {
+            prompt,
+            command_mode,
+        } => {
+            // task-notification payloads embed structured XML in `prompt`.
+            // Other command modes (inline commands, etc.) are harness-internal
+            // and not yet worth surfacing.
+            if command_mode == "task-notification" {
+                let task_id = extract_xml_tag(&prompt, "task-id");
+                let status = extract_xml_tag(&prompt, "status").unwrap_or_else(|| "unknown".into());
+                let summary = extract_xml_tag(&prompt, "summary")
+                    .unwrap_or_else(|| "Background task completed".into());
+                Some(EventKind::BackgroundTaskResult {
+                    task_id,
+                    status,
+                    summary,
+                })
+            } else {
+                None
+            }
+        }
+
+        RawAttachment::CommandPermissions { allowed_tools } => {
+            Some(EventKind::PermissionsUpdated { allowed_tools })
+        }
+
+        RawAttachment::Other => None,
+    }
+}
+
+/// Extract the text content of a simple XML tag (no attributes, no nesting).
+fn extract_xml_tag(xml: &str, tag: &str) -> Option<String> {
+    let open = format!("<{tag}>");
+    let close = format!("</{tag}>");
+    let start = xml.find(&open)? + open.len();
+    let end = xml.find(&close)?;
+    if start <= end {
+        Some(xml[start..end].trim().to_owned())
+    } else {
+        None
     }
 }
 
@@ -208,14 +415,7 @@ mod tests {
         ClaudeAdapter
     }
 
-    // ── parse_line happy paths ───────────────────────────────────────────────
-
-    #[test]
-    fn queue_operation_produces_no_events() {
-        let line = r#"{"type":"queue-operation","operation":"enqueue","timestamp":"2026-05-29T14:00:00Z","sessionId":"00000000-0000-0000-0000-000000000001"}"#;
-        let events = adapter().parse_line(line).unwrap();
-        assert!(events.is_empty());
-    }
+    // ── existing record types ────────────────────────────────────────────────
 
     #[test]
     fn user_text_produces_user_message_event() {
@@ -390,8 +590,6 @@ mod tests {
 
     #[test]
     fn object_valued_usage_fields_do_not_crash_parser() {
-        // server_tool_use and cache_creation are objects in real JSONL, not numbers.
-        // The parser must skip them cleanly rather than returning Err.
         let line = r#"{
             "type":"assistant",
             "uuid":"00000000-0000-0000-0000-000000000010",
@@ -411,6 +609,257 @@ mod tests {
         assert!(
             !events.is_empty(),
             "should still produce events despite unknown object fields"
+        );
+    }
+
+    // ── new record types ─────────────────────────────────────────────────────
+
+    #[test]
+    fn queue_operation_enqueue_produces_event() {
+        let line = r#"{"type":"queue-operation","operation":"enqueue","timestamp":"2026-05-29T14:00:00Z","sessionId":"00000000-0000-0000-0000-000000000001","uuid":"00000000-0000-0000-0000-000000000011"}"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(
+            matches!(&events[0].kind, EventKind::QueueOperation { operation } if operation == "enqueue")
+        );
+    }
+
+    #[test]
+    fn queue_operation_dequeue_produces_event() {
+        let line = r#"{"type":"queue-operation","operation":"dequeue","timestamp":"2026-05-29T14:00:00Z","sessionId":"00000000-0000-0000-0000-000000000001","uuid":"00000000-0000-0000-0000-000000000012"}"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(
+            matches!(&events[0].kind, EventKind::QueueOperation { operation } if operation == "dequeue")
+        );
+    }
+
+    #[test]
+    fn pr_link_produces_pr_linked_event() {
+        let line = r#"{
+            "type":"pr-link",
+            "uuid":"00000000-0000-0000-0000-000000000013",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "prNumber":4,
+            "prUrl":"https://github.com/org/repo/pull/4",
+            "prRepository":"org/repo"
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0].kind {
+            EventKind::PrLinked {
+                pr_number,
+                pr_url,
+                repository,
+            } => {
+                assert_eq!(*pr_number, 4);
+                assert_eq!(pr_url, "https://github.com/org/repo/pull/4");
+                assert_eq!(repository, "org/repo");
+            }
+            other => panic!("expected PrLinked, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn last_prompt_produces_last_prompt_event() {
+        let line = r#"{
+            "type":"last-prompt",
+            "uuid":"00000000-0000-0000-0000-000000000014",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "lastPrompt":"do the thing",
+            "leafUuid":"00000000-0000-0000-0000-000000000099"
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(
+            matches!(&events[0].kind, EventKind::LastPrompt { content } if content == "do the thing")
+        );
+    }
+
+    #[test]
+    fn file_history_snapshot_produces_file_snapshot_event() {
+        let line = r#"{
+            "type":"file-history-snapshot",
+            "uuid":"00000000-0000-0000-0000-000000000015",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "messageId":"00000000-0000-0000-0000-000000000020",
+            "snapshot":{"messageId":"00000000-0000-0000-0000-000000000020","trackedFileBackups":{},"timestamp":"2026-05-29T14:00:00Z"},
+            "isSnapshotUpdate":false
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(
+            &events[0].kind,
+            EventKind::FileSnapshot { is_update: false }
+        ));
+    }
+
+    #[test]
+    fn system_error_with_retry_fields_parsed() {
+        let line = r#"{
+            "type":"system",
+            "uuid":"00000000-0000-0000-0000-000000000016",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "subtype":"api_error",
+            "level":"error",
+            "error":{"message":"Connection error.","formatted":"Unable to connect (ECONNRESET)","connection":{"code":"ECONNRESET"}},
+            "retryInMs":534.4,
+            "retryAttempt":1,
+            "maxRetries":10
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0].kind {
+            EventKind::SystemError {
+                code,
+                retry_attempt,
+                max_retries,
+                retry_in_ms,
+                ..
+            } => {
+                assert_eq!(code.as_deref(), Some("ECONNRESET"));
+                assert_eq!(*retry_attempt, Some(1));
+                assert_eq!(*max_retries, Some(10));
+                assert!(retry_in_ms.is_some());
+            }
+            other => panic!("expected SystemError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn attachment_deferred_tools_delta_produces_tools_registered() {
+        let line = r#"{
+            "type":"attachment",
+            "uuid":"00000000-0000-0000-0000-000000000017",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "attachment":{
+                "type":"deferred_tools_delta",
+                "addedNames":["TodoWrite","WebFetch"],
+                "addedLines":["TodoWrite","WebFetch"],
+                "removedNames":[]
+            }
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0].kind {
+            EventKind::ToolsRegistered { added, removed } => {
+                assert_eq!(added, &["TodoWrite", "WebFetch"]);
+                assert!(removed.is_empty());
+            }
+            other => panic!("expected ToolsRegistered, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn attachment_plan_mode_produces_plan_mode_entered() {
+        let line = r#"{
+            "type":"attachment",
+            "uuid":"00000000-0000-0000-0000-000000000018",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "attachment":{
+                "type":"plan_mode",
+                "reminderType":"full",
+                "isSubAgent":false,
+                "planFilePath":"/tmp/my-plan.md",
+                "planExists":false
+            }
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0].kind {
+            EventKind::PlanModeEntered {
+                plan_file,
+                plan_exists,
+            } => {
+                assert_eq!(plan_file.as_deref(), Some("/tmp/my-plan.md"));
+                assert!(!plan_exists);
+            }
+            other => panic!("expected PlanModeEntered, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn attachment_hook_context_produces_hook_output() {
+        let line = r#"{
+            "type":"attachment",
+            "uuid":"00000000-0000-0000-0000-000000000019",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "attachment":{
+                "type":"hook_additional_context",
+                "content":["<ide_diagnostics>error here</ide_diagnostics>"],
+                "hookName":"PostToolUse:Edit",
+                "toolUseID":"toolu_abc123",
+                "hookEvent":"PostToolUse"
+            }
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0].kind {
+            EventKind::HookOutput {
+                hook_name,
+                tool_use_id,
+                content,
+            } => {
+                assert_eq!(hook_name, "PostToolUse:Edit");
+                assert_eq!(tool_use_id.as_deref(), Some("toolu_abc123"));
+                assert_eq!(content.len(), 1);
+            }
+            other => panic!("expected HookOutput, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn attachment_task_notification_extracts_summary() {
+        let prompt = "<task-notification>\n<task-id>abc123</task-id>\n<status>completed</status>\n<summary>Build succeeded (exit code 0)</summary>\n</task-notification>";
+        let line = format!(
+            r#"{{
+            "type":"attachment",
+            "uuid":"00000000-0000-0000-0000-000000000020",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "attachment":{{
+                "type":"queued_command",
+                "prompt":{prompt:?},
+                "commandMode":"task-notification"
+            }}
+        }}"#
+        );
+        let events = adapter().parse_line(&line).unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0].kind {
+            EventKind::BackgroundTaskResult {
+                task_id,
+                status,
+                summary,
+            } => {
+                assert_eq!(task_id.as_deref(), Some("abc123"));
+                assert_eq!(status, "completed");
+                assert!(summary.contains("Build succeeded"));
+            }
+            other => panic!("expected BackgroundTaskResult, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn attachment_unknown_subtype_produces_no_events() {
+        let line = r#"{
+            "type":"attachment",
+            "uuid":"00000000-0000-0000-0000-000000000021",
+            "timestamp":"2026-05-29T14:00:00Z",
+            "sessionId":"00000000-0000-0000-0000-000000000001",
+            "attachment":{"type":"some_future_type","data":"irrelevant"}
+        }"#;
+        let events = adapter().parse_line(line).unwrap();
+        assert!(
+            events.is_empty(),
+            "unknown attachment types should produce no events"
         );
     }
 
@@ -440,5 +889,19 @@ mod tests {
     fn flatten_content_empty_array_gives_empty_string() {
         let v = serde_json::Value::Array(vec![]);
         assert_eq!(flatten_content(v), "");
+    }
+
+    // ── extract_xml_tag ──────────────────────────────────────────────────────
+
+    #[test]
+    fn extract_xml_tag_finds_simple_tag() {
+        let xml = "<status>completed</status>";
+        assert_eq!(extract_xml_tag(xml, "status").as_deref(), Some("completed"));
+    }
+
+    #[test]
+    fn extract_xml_tag_returns_none_for_missing_tag() {
+        let xml = "<other>value</other>";
+        assert_eq!(extract_xml_tag(xml, "status"), None);
     }
 }
